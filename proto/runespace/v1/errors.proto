@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package runespace.v1;
+
+option go_package = "github.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepb";
+
+// ErrorReason is the machine-readable cause attached to a failed RPC via a
+// google.rpc.ErrorInfo status detail; the gRPC status code stays the coarse
+// classifier. Clients branch on the code first, then on the reason for precise
+// handling (mapping lives in internal/server/grpcerr.go).
+enum ErrorReason {
+  ERROR_REASON_UNSPECIFIED = 0;
+
+  // INVALID_ARGUMENT — caller input.
+  ERROR_REASON_INVALID_ID = 1;
+  ERROR_REASON_MISSING_RMP_ITEM = 2;
+  ERROR_REASON_MISSING_MM_ITEM = 13;       // mm_item is required on every insert
+  ERROR_REASON_INVALID_METADATA_JSON = 3;
+  ERROR_REASON_MISSING_QUERY = 4;
+  ERROR_REASON_MISSING_ID = 5;
+  ERROR_REASON_MISSING_EVAL_KEYS = 6;
+  ERROR_REASON_EVAL_KEY_INTEGRITY = 7;     // a streamed eval key failed its length/sha256 check
+  ERROR_REASON_INVALID_CLUSTER_ID = 8;     // cluster_id outside [0, nlist) on a cluster insert
+  ERROR_REASON_CENTROID_VERSION_MISMATCH = 9; // insert's centroid_set_version != the loaded set
+
+  // FAILED_PRECONDITION — server state.
+  ERROR_REASON_KEYS_NOT_REGISTERED = 10;
+  ERROR_REASON_KEY_ROTATION_UNSUPPORTED = 11;
+  ERROR_REASON_CLUSTER_NOT_CONFIGURED = 12; // mm_item sent but the instance has no centroid set
+
+  // UNAVAILABLE — transient, retryable.
+  ERROR_REASON_MANIFEST_BUSY = 20;
+
+  // RESOURCE_EXHAUSTED — a hard capacity limit was hit.
+  ERROR_REASON_MAX_ROWS_EXCEEDED = 50; // insert rejected: engine.max_rows cap reached
+
+  // INTERNAL — opaque to the client; the cause is server-side logs only.
+  ERROR_REASON_ENGINE_FAILURE = 30;
+  ERROR_REASON_MANIFEST_IO = 31;
+  ERROR_REASON_WAL_IO = 32;
+
+  // CANCELED / DEADLINE_EXCEEDED — the caller went away mid-request.
+  ERROR_REASON_REQUEST_CANCELED = 40;
+}

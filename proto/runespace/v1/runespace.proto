@@ -1,0 +1,334 @@
+syntax = "proto3";
+
+package runespace.v1;
+
+option go_package = "github.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepb";
+
+// RuneSpaceService is the per-team data-plane API for the encrypted vector index
+// engine. The engine holds only the PUBLIC evaluation key (never the secret
+// key); decryption happens client-side / in Vault.
+//
+// Provisioning: the instance boots UNREGISTERED. RegisterKeysStream loads the
+// RMP+MM eval keys (persisted to the PV, reloaded on restart/crash). Insert,
+// Search, and Delete are rejected with FAILED_PRECONDITION until keys are
+// registered.
+service RuneSpaceService {
+  // GetInfo returns build metadata, a live cgo self-check of the evi engine,
+  // whether eval keys are registered (ready), and the space occupancy counts.
+  rpc GetInfo(GetInfoRequest) returns (GetInfoResponse);
+
+  // RegisterKeysStream loads the PUBLIC RMP+MM evaluation keys into the engine
+  // and persists them to the PV. Eval keys exceed the per-message size limit
+  // (the MM eval key is hundreds of MB), so the client streams each key as a
+  // header, its data chunks in order, then a footer carrying a sha256 the server
+  // verifies before applying. One-shot (rotation is future); required before any
+  // data-plane RPC.
+  rpc RegisterKeysStream(stream RegisterKeysStreamRequest) returns (RegisterKeysStreamResponse);
+
+  // Insert appends one encrypted item under a client-supplied opaque id. The
+  // item carries a flat (RMP) representation and, when the cluster tier is
+  // configured, a compact cluster (MM) representation plus its routed
+  // cluster id. Idempotent: re-inserting an existing id is a no-op.
+  rpc Insert(InsertRequest) returns (InsertResponse);
+
+  // Search runs a blind homomorphic search and returns the serialized encrypted
+  // result blob; the client decrypts and ranks.
+  rpc Search(SearchRequest) returns (SearchResponse);
+
+  // GetCentroids streams the immutable IVF centroid set the instance loaded at
+  // boot: one header frame (version/dim/preset/nlist), then the centroids in
+  // id-ordered batches. A client reads it once and caches it to compute, in
+  // plaintext, the nearest cluster for an Insert. It is streamed rather than
+  // returned whole because a large set (nlist*dim floats) can exceed the
+  // per-message size limit. The set is version-pinned by a content hash; clients
+  // echo that as centroid_set_version on Insert. An empty version in the header
+  // means the cluster tier is not configured on this instance, which cannot
+  // accept inserts (every insert requires an mm_item routed against a centroid
+  // set).
+  rpc GetCentroids(GetCentroidsRequest) returns (stream GetCentroidsChunk);
+
+  // GetMetadata resolves search-result cell positions (cell_id, row) to
+  // (id, metadata) in one round-trip (the manifest-fetch step).
+  rpc GetMetadata(GetMetadataRequest) returns (GetMetadataResponse);
+
+  // Delete soft-deletes an id (plaintext tombstone filtered at query time —
+  // NOT an FHE masking op).
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // UpdateTags changes an item's opaque filter-tag set (add/remove) — the
+  // visibility labels Search intersects with a request scope. Memory-first then
+  // durable so a removed tag stops matching immediately.
+  rpc UpdateTags(UpdateTagsRequest) returns (UpdateTagsResponse);
+}
+
+message GetInfoRequest {}
+
+message GetInfoResponse {
+  // Build metadata (injected via -ldflags at build time).
+  string version = 1;
+  string commit = 2;
+  string build_date = 3;
+
+  // Live engine self-check via cgo.
+  string engine_status = 4;    // "ok" or an error string
+  uint32 engine_probe_dim = 5; // dim reported by a throwaway evi context
+
+  // True once eval keys have been registered (data plane is open).
+  bool ready = 6;
+
+  // Identity + fingerprint of each registered eval key, persisted at
+  // registration. A client compares these against its local key set to confirm
+  // the instance is serving its keys (see RegisterKeysStream / KeyMeta).
+  repeated KeyMeta registered_keys = 7;
+
+  // Space occupancy (counts only; no byte/disk accounting).
+  SpaceStats stats = 8;
+}
+
+// SpaceStats is a point-in-time count of the instance's occupancy. Counts only:
+// no on-disk byte accounting (that would need a directory walk). rows and
+// tombstoned are read from the manifest's in-memory counters (O(1)).
+message SpaceStats {
+  uint64 rows = 1;       // live (non-tombstoned) items currently indexed
+  uint64 max_rows = 2;   // configured hard cap enforced at insert; 0 = unlimited
+  uint64 tombstoned = 3; // soft-deleted items awaiting physical reclaim
+}
+
+message RegisterKeysStreamResponse {}
+
+// KeyKind identifies which eval key a RegisterKeysStream sequence carries.
+enum KeyKind {
+  KEY_KIND_UNSPECIFIED = 0;
+  KEY_KIND_RMP_EVAL = 1; // PUBLIC RMP eval key (IP0)
+  KEY_KIND_MM_EVAL = 2;  // PUBLIC MM eval key (IP1+)
+}
+
+// RegisterKeysStreamRequest is one frame of a RegisterKeysStream. Each key is
+// sent as exactly one header, its data chunks in order, then one footer. Send
+// all of one key's frames before starting the next.
+message RegisterKeysStreamRequest {
+  oneof payload {
+    KeyHeader header = 1;
+    bytes data = 2; // a contiguous slice of the current key's bytes
+    KeyFooter footer = 3;
+  }
+}
+
+message KeyHeader {
+  KeyKind kind = 1;
+  uint64 total_len = 2; // full key length; the server fast-fails on mismatch
+
+  // Key identity carried with the stream. The server pairs these with the
+  // footer's sha256 to persist a KeyMeta for cross-verification.
+  string kid = 3;       // key identifier
+  string preset = 4;    // CKKS preset, e.g. "IP0"
+  uint32 dim = 5;       // embedding dimension
+  string eval_mode = 6; // evi eval mode, e.g. "rmp"
+}
+
+message KeyFooter {
+  bytes sha256 = 1; // digest over all of this key's data bytes
+}
+
+// KeyMeta is the identity and fingerprint of one registered eval key. The
+// client derives it from the key set; the server persists it next to the raw
+// key bytes and echoes it from GetInfo, so both sides hold the same record.
+message KeyMeta {
+  KeyKind kind = 1;
+  string kid = 2;
+  string preset = 3;
+  uint32 dim = 4;
+  string eval_mode = 5;
+  bytes fingerprint = 6; // sha256 over the raw eval key bytes (== KeyFooter.sha256)
+}
+
+message InsertRequest {
+  // Client-supplied opaque UUID. The client owns it so an ack-loss retry reuses
+  // the same id and stays idempotent (existing id ⇒ no-op).
+  string id = 1;
+
+  // Caller-supplied metadata as a JSON document, stored verbatim in the
+  // manifest. Optional; if present it must be valid JSON. Plaintext — keep
+  // meaningful/secret values in the encrypted payload, not here.
+  string metadata = 2;
+
+  // Flat (RMP) representation. Required.
+  RMPItem rmp_item = 3;
+
+  // Cluster (MM) tier dual-representation. Required: every item carries both an
+  // rmp_item and an mm_item, routed against the instance's centroid set.
+  MMItem mm_item = 4;
+
+  // Opaque filter-tag set: visibility labels the engine never interprets. Empty =
+  // public (survives every scope). Assigned by a trusted caller (Vault) and stored
+  // verbatim; Search excludes an item whose tags don't intersect the request scope
+  // (see SearchRequest.filter_scope).
+  repeated string filter_tags = 5;
+}
+
+// RMPItem is the flat representation of an item.
+message RMPItem {
+  bytes item = 1; // ITEM-encoded evi query (CKKS/FHE embedding)
+}
+
+// MMItem is the compact cluster (MM) representation of an item plus the
+// plaintext routing the server stores for IVF. The client compact-encrypts
+// item with encryptRow, computes cluster_id as the nearest centroid in
+// plaintext, and echoes the centroid set version it routed against so the
+// server can reject a stale set.
+message MMItem {
+  bytes item = 1;                  // compact ITEM-encoded MM row (encryptRow)
+  uint32 cluster_id = 2;           // hard single assignment, 0..nlist-1
+  string centroid_set_version = 3; // must match the instance's loaded set
+}
+
+// InsertResponse is intentionally empty: the id is client-supplied and the slot is
+// internal; the ack signals a durable insert (or an idempotent no-op).
+message InsertResponse {}
+
+message GetCentroidsRequest {}
+
+// Centroid is one cluster's representative vector and its cluster id.
+message Centroid {
+  uint32 id = 1;          // cluster id, 0..nlist-1 (== index in the streamed set)
+  repeated float vec = 2; // length == dim
+}
+
+// GetCentroidsChunk is one frame of the GetCentroids server stream: exactly one
+// header first, then zero or more batches carrying the centroids in id order.
+message GetCentroidsChunk {
+  oneof payload {
+    CentroidSetHeader header = 1;
+    CentroidBatch batch = 2;
+  }
+}
+
+// CentroidSetHeader is the first stream frame: the set's identity and size. An
+// empty version means the cluster tier is not configured on this instance (no
+// batches follow), which cannot accept inserts.
+message CentroidSetHeader {
+  // Content-hash version of the set ("sha256:..."). Empty ⇒ the cluster tier is
+  // not configured. Clients echo this as InsertRequest.centroid_set_version.
+  string version = 1;
+  uint32 dim = 2;    // embedding dimension of each centroid vector
+  string preset = 3; // evi preset the set was trained for (e.g. "IP1")
+  uint32 nlist = 4;  // total centroid count, so the client preallocates
+}
+
+// CentroidBatch carries a contiguous, id-ordered slice of the set. The set is
+// split into batches so a large set (nlist*dim floats) transfers without a
+// single oversized message.
+message CentroidBatch {
+  repeated Centroid centroids = 1;
+}
+
+message SearchRequest {
+  // Plaintext, L2-normalized query embedding. Under PCMM the query is plaintext to
+  // the server regardless, so the client sends the raw (unit-normalized) vector and
+  // the server QUERY-encodes it per tier (flat = RMP/IP0, cluster = MM/IP1) — the
+  // two tiers use different CKKS contexts, so one client-side encoding cannot serve
+  // both. The server picks the probed clusters itself (the nprobe centroids nearest
+  // the query by inner product over its loaded set) and forces nprobe from instance
+  // config, so the request carries only the query.
+  repeated float query = 1;
+
+  // 2 was probe_clusters, 3 was centroid_set_version: client-side routing the server
+  // now owns. Search no longer touches the centroid set client-side, so neither is
+  // sent; the set stays pinned for inserts via MMItem.centroid_set_version.
+  reserved 2, 3;
+  reserved "probe_clusters", "centroid_set_version";
+
+  // Requester's allowed filter-tag scope (opaque). An item survives if it has no
+  // tags (public) or ≥1 tag intersecting this scope; the rest are folded into each
+  // cell's dead. Empty/unset = no filter (return all). Trusted from the caller (no
+  // signature yet); scope provenance is the caller's (Vault's) responsibility.
+  repeated string filter_scope = 4;
+}
+
+// CellResult is one cell's encrypted score blob, tagged with its cell id. Both
+// tiers return it: the flat (RMP/IP0) cells and the cluster (MM/IP1) cells. The
+// two tiers use different CKKS contexts, so the client decrypts each tier's
+// blobs with the matching key — but a result position is addressed the same way,
+// (cell_id, row). cell_id is scoped per tier (an rmp cell id and an mm cell id
+// are independent namespaces, disambiguated by which list the result is in).
+message CellResult {
+  uint32 cell_id = 1;
+  bytes blob = 2;
+  // Dead positions as a packed bitmap in this blob's local row coordinates: bit p
+  // (byte p/8, LSB-first) set ⇒ position p is dead. tombstone ∪ orphan ∪ tag-excluded
+  // fold into this one mask; the client applies it and drops set positions before
+  // top-k. Positions beyond the bitmap length are live. Captured after the blob, so a
+  // racing delete only over-excludes. Field 3 (repeated int64 position list) is
+  // retired — a scoped tag filter often makes most rows dead, so a bitmap (fixed
+  // rowCount/8) beats a varint list; the type change forces a new field number.
+  reserved 3;
+  bytes dead = 4;
+}
+
+message SearchResponse {
+  // Liveness epoch the dead data was captured at. Monotonic, so a racing delete
+  // only ever over-excludes (dead is captured after the blobs), never leaks.
+  int64 tomb_epoch = 1;
+
+  // Flat (RMP) tier cells — one blob per live flat cell (active + sealed). The
+  // client decrypts each with the RMP key, drops dead, and ranks across cells.
+  repeated CellResult rmp = 2;
+
+  // Per probed cluster (MM) cell — empty when the cluster tier is unconfigured or
+  // no cluster cell was probed.
+  repeated CellResult mm = 3;
+}
+
+// CellRow addresses one result position (cell id + cell-local row) for metadata
+// resolution, in either tier. cell_id is scoped per tier (see GetMetadataRequest).
+message CellRow {
+  uint32 cell_id = 1;
+  int64 row = 2;
+}
+
+message GetMetadataRequest {
+  // 1 was rmp_slots (repeated int64): manifest-slot addressing before the cell model.
+  // A packed int64 silently misparses as a CellRow (same wire type), so rmp_rows takes
+  // a fresh number rather than reusing 1. mm_rows kept 2: MMRow and CellRow are wire-
+  // identical, so that field migrated in place.
+  reserved 1;
+  reserved "rmp_slots";
+  // Flat (RMP) cell positions to resolve via the live flat cells' row->id maps.
+  repeated CellRow rmp_rows = 3;
+  // Cluster (MM) cell positions to resolve via the live cluster cells' row->id maps.
+  repeated CellRow mm_rows = 2;
+  // Same scope as the paired Search. A resolved position whose id is out of scope is
+  // returned with an empty id — the boundary's second gate, so a caller can't
+  // re-resolve a dead position back to its id/tag membership. Empty/unset = no gate.
+  repeated string filter_scope = 4;
+}
+
+message GetMetadataResponse {
+  // One entry per rmp_rows element, in the same order, so the client zips each
+  // back to its score. An unknown position yields an entry with an empty id.
+  repeated MetadataEntry rmp_entries = 1;
+  // One entry per mm_rows element, in the same order.
+  repeated MetadataEntry mm_entries = 2;
+}
+
+message MetadataEntry {
+  string id = 1;       // opaque UUID ("" if the slot has no manifest row)
+  string metadata = 2; // stored JSON document (plaintext)
+}
+
+message DeleteRequest {
+  string id = 1; // opaque UUID to tombstone
+}
+
+message DeleteResponse {}
+
+// UpdateTagsRequest changes an item's opaque filter-tag set. add and remove are
+// applied to the current set (add wins on overlap); both are idempotent. An unknown
+// id is a no-op.
+message UpdateTagsRequest {
+  string id = 1;
+  repeated string add = 2;
+  repeated string remove = 3;
+}
+
+message UpdateTagsResponse {}

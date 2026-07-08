@@ -1,0 +1,40 @@
+package runespace
+
+import "errors"
+
+var (
+	// ErrAddressRequired is returned by Dial when given an empty address.
+	ErrAddressRequired = errors.New("runespace: server address is required")
+	// ErrClientClosed is returned by Client methods after Close.
+	ErrClientClosed = errors.New("runespace: client is closed")
+	// ErrKeysNotRegistered is returned by data-plane calls made before
+	// RegisterKeys has bound a key set to the client.
+	ErrKeysNotRegistered = errors.New("runespace: keys not registered on client (call RegisterKeys first)")
+
+	// ErrKeysAlreadyExist / ErrKeysNotFound concern the on-disk key set.
+	ErrKeysAlreadyExist = errors.New("runespace: key files already exist at path")
+	ErrKeysNotFound     = errors.New("runespace: key files not found at path")
+
+	// Key-part guards: a Keys opened without a given KeyPart cannot
+	// perform the corresponding operation.
+	ErrKeysNotForEncrypt  = errors.New("runespace: keys opened without KeyPartEnc cannot encrypt")
+	ErrKeysNotForDecrypt  = errors.New("runespace: keys opened without KeyPartSec cannot decrypt")
+	ErrKeysNotForRegister = errors.New("runespace: keys opened without KeyPartEval have no eval key to register")
+
+	// ErrDimMismatch is returned when an Insert/Search vector length does not
+	// match the key set dimension.
+	ErrDimMismatch = errors.New("runespace: vector length does not match key set dimension")
+
+	// ErrInvalidMetadata is returned by Insert when the metadata document is
+	// non-empty but not valid JSON (the server rejects it too).
+	ErrInvalidMetadata = errors.New("runespace: metadata must be valid JSON")
+
+	// ErrClusterRequired is returned by Insert when the server exposes no centroid
+	// set. Every insert carries a clustered (MM) representation, so a configured
+	// clustered tier is mandatory; a flat-only instance cannot accept inserts.
+	ErrClusterRequired = errors.New("runespace: server has no centroid set; inserts require a configured clustered tier")
+
+	// ErrUnimplemented marks the MM (clustered, IP1+) path, which is reserved
+	// but not yet available.
+	ErrUnimplemented = errors.New("runespace: not implemented (MM path is reserved)")
+)
