@@ -91,6 +91,18 @@ func Dial(addr string, opts ...ClientOption) (*Client, error) {
 		dialOpts = append(dialOpts, grpc.WithChainUnaryInterceptor(interceptors...))
 	}
 
+	// Streaming RPCs (RegisterKeysStream, GetCentroids) are distinct HTTP/2
+	// requests, so the bearer token must ride on them too — otherwise an edge
+	// gateway verifying a JWT per request rejects the stream.
+	var streamInterceptors []grpc.StreamClientInterceptor
+	if o.AccessToken != "" {
+		streamInterceptors = append(streamInterceptors, bearerTokenStreamInterceptor(o.AccessToken))
+	}
+	streamInterceptors = append(streamInterceptors, o.StreamInterceptors...)
+	if len(streamInterceptors) > 0 {
+		dialOpts = append(dialOpts, grpc.WithChainStreamInterceptor(streamInterceptors...))
+	}
+
 	conn, err := grpc.NewClient(addr, dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("runespace: dial %s: %w", addr, err)
@@ -664,5 +676,15 @@ func bearerTokenInterceptor(token string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
 		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
+// bearerTokenStreamInterceptor injects an "authorization: Bearer <token>" header
+// on every streaming RPC — the streaming counterpart of bearerTokenInterceptor,
+// so client- and server-streaming calls authenticate exactly like unary ones.
+func bearerTokenStreamInterceptor(token string) grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+		return streamer(ctx, desc, cc, method, opts...)
 	}
 }
