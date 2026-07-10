@@ -13,12 +13,13 @@ const (
 )
 
 type clientOptions struct {
-	AccessToken       string
-	KeepaliveTime     time.Duration
-	KeepaliveTimeout  time.Duration
-	MaxMsgSize        int
-	Insecure          bool
-	UnaryInterceptors []grpc.UnaryClientInterceptor
+	AccessToken        string
+	KeepaliveTime      time.Duration
+	KeepaliveTimeout   time.Duration
+	MaxMsgSize         int
+	Insecure           bool
+	UnaryInterceptors  []grpc.UnaryClientInterceptor
+	StreamInterceptors []grpc.StreamClientInterceptor
 }
 
 func defaultClientOptions() clientOptions {
@@ -32,8 +33,9 @@ func defaultClientOptions() clientOptions {
 // ClientOption configures Dial. Apply via the With* helpers below.
 type ClientOption func(*clientOptions)
 
-// WithAccessToken attaches a bearer token to every RPC via the "authorization"
-// metadata header.
+// WithAccessToken attaches a bearer token to every RPC — unary and streaming —
+// via the "authorization" metadata header, so an edge gateway that verifies a
+// JWT on every request (e.g. Envoy) accepts streaming calls too.
 func WithAccessToken(token string) ClientOption {
 	return func(o *clientOptions) { o.AccessToken = token }
 }
@@ -69,4 +71,10 @@ func WithInsecure() ClientOption {
 // the order they were added (after the built-in auth interceptor, if any).
 func WithUnaryInterceptor(i grpc.UnaryClientInterceptor) ClientOption {
 	return func(o *clientOptions) { o.UnaryInterceptors = append(o.UnaryInterceptors, i) }
+}
+
+// WithStreamInterceptor appends a stream client interceptor. Interceptors run in
+// the order they were added (after the built-in auth interceptor, if any).
+func WithStreamInterceptor(i grpc.StreamClientInterceptor) ClientOption {
+	return func(o *clientOptions) { o.StreamInterceptors = append(o.StreamInterceptors, i) }
 }
