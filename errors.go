@@ -1,6 +1,11 @@
 package runespace
 
-import "errors"
+import (
+	"errors"
+
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/status"
+)
 
 var (
 	// ErrAddressRequired is returned by Dial when given an empty address.
@@ -34,7 +39,34 @@ var (
 	// clustered tier is mandatory; a flat-only instance cannot accept inserts.
 	ErrClusterRequired = errors.New("runespace: server has no centroid set; inserts require a configured clustered tier")
 
+	// ErrCentroidVersionMismatch is returned by insert paths when the item's
+	// centroid_set_version does not match the server's loaded set — the set was
+	// replaced while this client (or the routing side) held the old one. The
+	// caller should InvalidateCentroidCache, refetch/re-route against the new
+	// set, and retry the insert once with the same id.
+	ErrCentroidVersionMismatch = errors.New("runespace: centroid set version mismatch (set was replaced)")
+
 	// ErrUnimplemented marks the MM (clustered, IP1+) path, which is reserved
 	// but not yet available.
 	ErrUnimplemented = errors.New("runespace: not implemented (MM path is reserved)")
 )
+
+// centroidMismatchReason is the ErrorInfo reason the server attaches when an
+// insert's centroid_set_version does not match the loaded set (runespace
+// internal/server/grpcerr.go, pb.ErrorReason_ERROR_REASON_CENTROID_VERSION_MISMATCH).
+const centroidMismatchReason = "ERROR_REASON_CENTROID_VERSION_MISMATCH"
+
+// isCentroidVersionMismatch reports whether a gRPC error carries the server's
+// centroid-version-mismatch reason in its ErrorInfo detail.
+func isCentroidVersionMismatch(err error) bool {
+	st, ok := status.FromError(err)
+	if !ok {
+		return false
+	}
+	for _, d := range st.Details() {
+		if info, ok := d.(*errdetails.ErrorInfo); ok && info.GetReason() == centroidMismatchReason {
+			return true
+		}
+	}
+	return false
+}
