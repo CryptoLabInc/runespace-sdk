@@ -446,6 +446,12 @@ func (c *Client) insertWithRetry(ctx context.Context, req *pb.InsertRequest) err
 			return nil
 		} else {
 			lastErr = err
+			if isCentroidVersionMismatch(err) {
+				// The server replaced its centroid set; retrying the same
+				// request can never succeed. Surface the typed sentinel so the
+				// caller can invalidate, re-route, and retry once.
+				return fmt.Errorf("runespace: insert %s: %s: %w", req.GetId(), status.Convert(err).Message(), ErrCentroidVersionMismatch)
+			}
 			if status.Code(err) != codes.Unavailable {
 				return err
 			}
