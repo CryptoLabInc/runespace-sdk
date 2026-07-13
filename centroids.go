@@ -16,6 +16,10 @@ import (
 type CentroidSet struct {
 	Version string
 	Dim     int
+	// Preset is the evi preset the set was trained for (e.g. "IP1"). It is a
+	// Version-hash ingredient, so relay consumers (runed) need it to recompute
+	// and verify the content hash. Empty when the server predates the field.
+	Preset  string
 	Vectors [][]float32
 }
 
@@ -45,5 +49,5 @@ func (c *Client) Centroids(ctx context.Context) (*CentroidSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("runespace: centroids: %w", err)
 	}
-	return &CentroidSet{Version: cs.version, Dim: cs.dim, Vectors: cs.vectors}, nil
+	return &CentroidSet{Version: cs.version, Dim: cs.dim, Preset: cs.preset, Vectors: cs.vectors}, nil
 }
