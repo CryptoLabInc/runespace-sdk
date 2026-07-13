@@ -28,6 +28,7 @@ const FlatClusterID = int32(-1)
 type centroidSet struct {
 	version string
 	dim     int
+	preset  string // evi preset the set was trained for (hash ingredient — relayed for verification)
 	vectors [][]float32 // vectors[i] is cluster i's centroid; len == nlist
 }
 
@@ -56,6 +57,7 @@ func readCentroidSet(stream centroidStreamReader) (*centroidSet, error) {
 		case *pb.GetCentroidsChunk_Header:
 			cs.version = p.Header.GetVersion()
 			cs.dim = int(p.Header.GetDim())
+			cs.preset = p.Header.GetPreset()
 			if n := p.Header.GetNlist(); n > 0 {
 				cs.vectors = make([][]float32, 0, n)
 			}
