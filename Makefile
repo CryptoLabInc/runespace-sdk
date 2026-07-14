@@ -6,27 +6,19 @@
 # CGO_ENABLED=1 is set explicitly so cross-compile environments don't
 # silently produce a non-functional binary.
 
-.PHONY: build test test-e2e vet fmt tidy cover
+.PHONY: build test vet fmt tidy cover
 
 export CGO_ENABLED=1
 
-# `make test-e2e` talks to a live RuneSpace instance. RUNESPACE_ADDR is empty
-# by default so the suite t.Skips; set it to run:
-#   make test-e2e RUNESPACE_ADDR=runespace.example:51024 RUNESPACE_TOKEN=...
-# RUNESPACE_DIM must match the server's configured dimension.
-RUNESPACE_ADDR  ?=
-RUNESPACE_TOKEN ?=
-RUNESPACE_DIM   ?=
-export RUNESPACE_ADDR RUNESPACE_TOKEN RUNESPACE_DIM
+# The end-to-end verification suite that drives a live server lives in the
+# runespace repo (tests/), next to the engine it verifies. This repo ships the
+# public client plus runnable usage examples under examples/ (built by `build`).
 
 build:
 	go build ./...
 
 test:
 	go test ./...
-
-test-e2e:
-	cd tests && go test -tags=e2e -timeout 10m -parallel 1 ./e2e/...
 
 vet:
 	go vet ./...

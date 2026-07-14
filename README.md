@@ -129,6 +129,25 @@ same client inserted (see `Match`).
 
 Full API reference: <https://pkg.go.dev/github.com/CryptoLabInc/runespace-sdk>
 
+## Examples
+
+Runnable programs under `examples/` illustrate the common flows against a live
+instance (configured via `RUNESPACE_ADDR` / `RUNESPACE_DIM` / `RUNESPACE_TOKEN` /
+`RUNESPACE_KEYS`):
+
+| Example | Flow |
+| ------- | ---- |
+| `examples/quickstart` | keygen → dial → register → insert → blind search |
+| `examples/filtertags` | tagged insert, scoped search, and the `UpdateTags` / `RetagAll` / `RemoveTag` tag mutators |
+
+```sh
+RUNESPACE_ADDR=127.0.0.1:51024 RUNESPACE_DIM=128 go run ./examples/quickstart
+```
+
+The end-to-end **verification** suite that stands up a real server and asserts
+crash/recovery/rebalance behavior lives in the `runespace` repo (`tests/`), next
+to the engine it verifies — not here.
+
 ## Loading only the keys you need
 
 `OpenKeys` materialises all three key parts (EncKey, EvalKey, SecKey) by
@@ -155,9 +174,8 @@ make test
 
 | Target | Action |
 | ------ | ------ |
-| `make build` | `go build ./...` |
+| `make build` | `go build ./...` (includes the `examples/`) |
 | `make test` | `go test ./...` |
-| `make test-e2e` | run the gated e2e suite (see `tests/README.md`) |
 | `make vet` | `go vet ./...` |
 | `make fmt` | `gofmt -w .` |
 | `make tidy` | `go mod tidy` |
