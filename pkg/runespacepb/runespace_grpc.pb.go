@@ -27,6 +27,8 @@ const (
 	RuneSpaceService_GetMetadata_FullMethodName        = "/runespace.v1.RuneSpaceService/GetMetadata"
 	RuneSpaceService_Delete_FullMethodName             = "/runespace.v1.RuneSpaceService/Delete"
 	RuneSpaceService_UpdateTags_FullMethodName         = "/runespace.v1.RuneSpaceService/UpdateTags"
+	RuneSpaceService_RetagAll_FullMethodName           = "/runespace.v1.RuneSpaceService/RetagAll"
+	RuneSpaceService_RemoveTag_FullMethodName          = "/runespace.v1.RuneSpaceService/RemoveTag"
 )
 
 // RuneSpaceServiceClient is the client API for RuneSpaceService service.
@@ -81,6 +83,16 @@ type RuneSpaceServiceClient interface {
 	// visibility labels Search intersects with a request scope. Memory-first then
 	// durable so a removed tag stops matching immediately.
 	UpdateTags(ctx context.Context, in *UpdateTagsRequest, opts ...grpc.CallOption) (*UpdateTagsResponse, error)
+	// RetagAll replaces filter tag `from` with `to` on every item that currently
+	// carries `from`, applied per item (memory-first then durable) like UpdateTags
+	// — no cell mutation or rebalance. Idempotent and re-runnable: an item already
+	// carrying `to` keeps a single copy. `from` and `to` are required and must
+	// differ; use RemoveTag to strip a tag entirely.
+	RetagAll(ctx context.Context, in *RetagAllRequest, opts ...grpc.CallOption) (*RetagAllResponse, error)
+	// RemoveTag strips filter tag `tag` from every item that currently carries it,
+	// applied per item (memory-first then durable) like UpdateTags. Idempotent and
+	// re-runnable.
+	RemoveTag(ctx context.Context, in *RemoveTagRequest, opts ...grpc.CallOption) (*RemoveTagResponse, error)
 }
 
 type runeSpaceServiceClient struct {
@@ -183,6 +195,26 @@ func (c *runeSpaceServiceClient) UpdateTags(ctx context.Context, in *UpdateTagsR
 	return out, nil
 }
 
+func (c *runeSpaceServiceClient) RetagAll(ctx context.Context, in *RetagAllRequest, opts ...grpc.CallOption) (*RetagAllResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RetagAllResponse)
+	err := c.cc.Invoke(ctx, RuneSpaceService_RetagAll_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runeSpaceServiceClient) RemoveTag(ctx context.Context, in *RemoveTagRequest, opts ...grpc.CallOption) (*RemoveTagResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveTagResponse)
+	err := c.cc.Invoke(ctx, RuneSpaceService_RemoveTag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RuneSpaceServiceServer is the server API for RuneSpaceService service.
 // All implementations must embed UnimplementedRuneSpaceServiceServer
 // for forward compatibility.
@@ -235,6 +267,16 @@ type RuneSpaceServiceServer interface {
 	// visibility labels Search intersects with a request scope. Memory-first then
 	// durable so a removed tag stops matching immediately.
 	UpdateTags(context.Context, *UpdateTagsRequest) (*UpdateTagsResponse, error)
+	// RetagAll replaces filter tag `from` with `to` on every item that currently
+	// carries `from`, applied per item (memory-first then durable) like UpdateTags
+	// — no cell mutation or rebalance. Idempotent and re-runnable: an item already
+	// carrying `to` keeps a single copy. `from` and `to` are required and must
+	// differ; use RemoveTag to strip a tag entirely.
+	RetagAll(context.Context, *RetagAllRequest) (*RetagAllResponse, error)
+	// RemoveTag strips filter tag `tag` from every item that currently carries it,
+	// applied per item (memory-first then durable) like UpdateTags. Idempotent and
+	// re-runnable.
+	RemoveTag(context.Context, *RemoveTagRequest) (*RemoveTagResponse, error)
 	mustEmbedUnimplementedRuneSpaceServiceServer()
 }
 
@@ -268,6 +310,12 @@ func (UnimplementedRuneSpaceServiceServer) Delete(context.Context, *DeleteReques
 }
 func (UnimplementedRuneSpaceServiceServer) UpdateTags(context.Context, *UpdateTagsRequest) (*UpdateTagsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateTags not implemented")
+}
+func (UnimplementedRuneSpaceServiceServer) RetagAll(context.Context, *RetagAllRequest) (*RetagAllResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RetagAll not implemented")
+}
+func (UnimplementedRuneSpaceServiceServer) RemoveTag(context.Context, *RemoveTagRequest) (*RemoveTagResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveTag not implemented")
 }
 func (UnimplementedRuneSpaceServiceServer) mustEmbedUnimplementedRuneSpaceServiceServer() {}
 func (UnimplementedRuneSpaceServiceServer) testEmbeddedByValue()                          {}
@@ -416,6 +464,42 @@ func _RuneSpaceService_UpdateTags_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RuneSpaceService_RetagAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RetagAllRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuneSpaceServiceServer).RetagAll(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuneSpaceService_RetagAll_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuneSpaceServiceServer).RetagAll(ctx, req.(*RetagAllRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RuneSpaceService_RemoveTag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveTagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuneSpaceServiceServer).RemoveTag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuneSpaceService_RemoveTag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuneSpaceServiceServer).RemoveTag(ctx, req.(*RemoveTagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RuneSpaceService_ServiceDesc is the grpc.ServiceDesc for RuneSpaceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -446,6 +530,14 @@ var RuneSpaceService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateTags",
 			Handler:    _RuneSpaceService_UpdateTags_Handler,
+		},
+		{
+			MethodName: "RetagAll",
+			Handler:    _RuneSpaceService_RetagAll_Handler,
+		},
+		{
+			MethodName: "RemoveTag",
+			Handler:    _RuneSpaceService_RemoveTag_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

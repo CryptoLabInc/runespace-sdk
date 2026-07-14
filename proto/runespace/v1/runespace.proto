@@ -59,6 +59,18 @@ service RuneSpaceService {
   // visibility labels Search intersects with a request scope. Memory-first then
   // durable so a removed tag stops matching immediately.
   rpc UpdateTags(UpdateTagsRequest) returns (UpdateTagsResponse);
+
+  // RetagAll replaces filter tag `from` with `to` on every item that currently
+  // carries `from`, applied per item (memory-first then durable) like UpdateTags
+  // — no cell mutation or rebalance. Idempotent and re-runnable: an item already
+  // carrying `to` keeps a single copy. `from` and `to` are required and must
+  // differ; use RemoveTag to strip a tag entirely.
+  rpc RetagAll(RetagAllRequest) returns (RetagAllResponse);
+
+  // RemoveTag strips filter tag `tag` from every item that currently carries it,
+  // applied per item (memory-first then durable) like UpdateTags. Idempotent and
+  // re-runnable.
+  rpc RemoveTag(RemoveTagRequest) returns (RemoveTagResponse);
 }
 
 message GetInfoRequest {}
@@ -332,3 +344,27 @@ message UpdateTagsRequest {
 }
 
 message UpdateTagsResponse {}
+
+// RetagAllRequest replaces one opaque filter tag with another across every item
+// carrying it. from and to are required and must differ (an item already holding
+// to keeps a single copy — set semantics). To strip a tag entirely use RemoveTag.
+message RetagAllRequest {
+  string from = 1;
+  string to = 2;
+}
+
+// RetagAllResponse reports how many items had their tag set changed.
+message RetagAllResponse {
+  uint64 changed = 1;
+}
+
+// RemoveTagRequest strips one opaque filter tag from every item carrying it. tag
+// is required.
+message RemoveTagRequest {
+  string tag = 1;
+}
+
+// RemoveTagResponse reports how many items had the tag removed.
+message RemoveTagResponse {
+  uint64 changed = 1;
+}
