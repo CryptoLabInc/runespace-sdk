@@ -670,6 +670,37 @@ func (c *Client) UpdateTags(ctx context.Context, id string, add, remove []string
 	return err
 }
 
+// RetagAll replaces filter tag from with to on every item that currently carries
+// from, returning how many items changed. Bulk, applied per item server-side
+// (memory-first then durable; idempotent and re-runnable) — an item already holding
+// to keeps a single copy. from and to are required and must differ; use RemoveTag to
+// strip a tag entirely. Tags are a query-time visibility filter, so this moves no
+// data and triggers no rebalance.
+func (c *Client) RetagAll(ctx context.Context, from, to string) (uint64, error) {
+	if !c.connOK() {
+		return 0, ErrClientClosed
+	}
+	resp, err := c.svc.RetagAll(ctx, &pb.RetagAllRequest{From: from, To: to})
+	if err != nil {
+		return 0, err
+	}
+	return resp.GetChanged(), nil
+}
+
+// RemoveTag strips filter tag tag from every item that currently carries it,
+// returning how many items changed. Bulk, applied per item server-side (memory-first
+// then durable; idempotent and re-runnable). tag is required.
+func (c *Client) RemoveTag(ctx context.Context, tag string) (uint64, error) {
+	if !c.connOK() {
+		return 0, ErrClientClosed
+	}
+	resp, err := c.svc.RemoveTag(ctx, &pb.RemoveTagRequest{Tag: tag})
+	if err != nil {
+		return 0, err
+	}
+	return resp.GetChanged(), nil
+}
+
 // bearerTokenInterceptor injects an "authorization: Bearer <token>" header on
 // every unary RPC.
 func bearerTokenInterceptor(token string) grpc.UnaryClientInterceptor {

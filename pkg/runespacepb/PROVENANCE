@@ -17,8 +17,9 @@ GetCentroidsResponse, so a large centroid set (nlist*dim floats) transfers witho
 one oversized message. GetCentroidsResponse was removed; CentroidSetHeader and
 CentroidBatch were added. That change is committed on the runespace epic branch as
 c23de29 (ahead of the af2b411 pin, not yet on main), so these files are NO LONGER a
-verbatim copy of the af2b411 pin. errors.pb.go remains verbatim. Fold into the next
-upstream re-pin once the change lands on main.
+verbatim copy of the af2b411 pin. errors.pb.go carries the ERROR_REASON_INVALID_TAG
+addition noted below (also ahead of the pin). Fold into the next upstream re-pin once
+the change lands on main.
 
 Additionally re-copied from the runespace `feat/team-based-filter` branch (working
 tree, not yet committed/landed) to add the filter-set (team-based) feature:
@@ -26,6 +27,12 @@ tree, not yet committed/landed) to add the filter-set (team-based) feature:
   - SearchRequest.filter_scope (4) — requester's allowed tag scope.
   - GetMetadataRequest.filter_scope (4) — same scope for the resolve-time gate.
   - UpdateTags RPC + UpdateTagsRequest/Response — add/remove an item's tags.
+  - RetagAll RPC + RetagAllRequest/Response — bulk replace filter tag `from` with
+    `to` across every item carrying it (returns the changed count).
+  - RemoveTag RPC + RemoveTagRequest/Response — bulk strip filter tag `tag` from
+    every item carrying it (returns the changed count).
+  - errors.pb.go: added ErrorReason ERROR_REASON_INVALID_TAG (14) for the bulk
+    tag-op argument gate — so errors.pb.go is NO LONGER verbatim at the af2b411 pin.
   - CellResult.dead changed from `repeated int64` (position list) to `bytes` (packed
     position bitmap, field renumbered 3->4); the SDK decode moved to a bit test.
 Re-pin to the landed commit once this feature merges upstream.

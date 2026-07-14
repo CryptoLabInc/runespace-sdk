@@ -1760,6 +1760,197 @@ func (*UpdateTagsResponse) Descriptor() ([]byte, []int) {
 	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{27}
 }
 
+// RetagAllRequest replaces one opaque filter tag with another across every item
+// carrying it. from and to are required and must differ (an item already holding
+// to keeps a single copy — set semantics). To strip a tag entirely use RemoveTag.
+type RetagAllRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	From          string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
+	To            string                 `protobuf:"bytes,2,opt,name=to,proto3" json:"to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetagAllRequest) Reset() {
+	*x = RetagAllRequest{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetagAllRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetagAllRequest) ProtoMessage() {}
+
+func (x *RetagAllRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetagAllRequest.ProtoReflect.Descriptor instead.
+func (*RetagAllRequest) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *RetagAllRequest) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *RetagAllRequest) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+// RetagAllResponse reports how many items had their tag set changed.
+type RetagAllResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Changed       uint64                 `protobuf:"varint,1,opt,name=changed,proto3" json:"changed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetagAllResponse) Reset() {
+	*x = RetagAllResponse{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetagAllResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetagAllResponse) ProtoMessage() {}
+
+func (x *RetagAllResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetagAllResponse.ProtoReflect.Descriptor instead.
+func (*RetagAllResponse) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *RetagAllResponse) GetChanged() uint64 {
+	if x != nil {
+		return x.Changed
+	}
+	return 0
+}
+
+// RemoveTagRequest strips one opaque filter tag from every item carrying it. tag
+// is required.
+type RemoveTagRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tag           string                 `protobuf:"bytes,1,opt,name=tag,proto3" json:"tag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveTagRequest) Reset() {
+	*x = RemoveTagRequest{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveTagRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveTagRequest) ProtoMessage() {}
+
+func (x *RemoveTagRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveTagRequest.ProtoReflect.Descriptor instead.
+func (*RemoveTagRequest) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *RemoveTagRequest) GetTag() string {
+	if x != nil {
+		return x.Tag
+	}
+	return ""
+}
+
+// RemoveTagResponse reports how many items had the tag removed.
+type RemoveTagResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Changed       uint64                 `protobuf:"varint,1,opt,name=changed,proto3" json:"changed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveTagResponse) Reset() {
+	*x = RemoveTagResponse{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveTagResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveTagResponse) ProtoMessage() {}
+
+func (x *RemoveTagResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveTagResponse.ProtoReflect.Descriptor instead.
+func (*RemoveTagResponse) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *RemoveTagResponse) GetChanged() uint64 {
+	if x != nil {
+		return x.Changed
+	}
+	return 0
+}
+
 var File_runespace_v1_runespace_proto protoreflect.FileDescriptor
 
 const file_runespace_v1_runespace_proto_rawDesc = "" +
@@ -1870,11 +2061,20 @@ const file_runespace_v1_runespace_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
 	"\x03add\x18\x02 \x03(\tR\x03add\x12\x16\n" +
 	"\x06remove\x18\x03 \x03(\tR\x06remove\"\x14\n" +
-	"\x12UpdateTagsResponse*P\n" +
+	"\x12UpdateTagsResponse\"5\n" +
+	"\x0fRetagAllRequest\x12\x12\n" +
+	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x02 \x01(\tR\x02to\",\n" +
+	"\x10RetagAllResponse\x12\x18\n" +
+	"\achanged\x18\x01 \x01(\x04R\achanged\"$\n" +
+	"\x10RemoveTagRequest\x12\x10\n" +
+	"\x03tag\x18\x01 \x01(\tR\x03tag\"-\n" +
+	"\x11RemoveTagResponse\x12\x18\n" +
+	"\achanged\x18\x01 \x01(\x04R\achanged*P\n" +
 	"\aKeyKind\x12\x18\n" +
 	"\x14KEY_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11KEY_KIND_RMP_EVAL\x10\x01\x12\x14\n" +
-	"\x10KEY_KIND_MM_EVAL\x10\x022\x8f\x05\n" +
+	"\x10KEY_KIND_MM_EVAL\x10\x022\xa8\x06\n" +
 	"\x10RuneSpaceService\x12F\n" +
 	"\aGetInfo\x12\x1c.runespace.v1.GetInfoRequest\x1a\x1d.runespace.v1.GetInfoResponse\x12i\n" +
 	"\x12RegisterKeysStream\x12'.runespace.v1.RegisterKeysStreamRequest\x1a(.runespace.v1.RegisterKeysStreamResponse(\x01\x12C\n" +
@@ -1884,7 +2084,9 @@ const file_runespace_v1_runespace_proto_rawDesc = "" +
 	"\vGetMetadata\x12 .runespace.v1.GetMetadataRequest\x1a!.runespace.v1.GetMetadataResponse\x12C\n" +
 	"\x06Delete\x12\x1b.runespace.v1.DeleteRequest\x1a\x1c.runespace.v1.DeleteResponse\x12O\n" +
 	"\n" +
-	"UpdateTags\x12\x1f.runespace.v1.UpdateTagsRequest\x1a .runespace.v1.UpdateTagsResponseBCZAgithub.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepbb\x06proto3"
+	"UpdateTags\x12\x1f.runespace.v1.UpdateTagsRequest\x1a .runespace.v1.UpdateTagsResponse\x12I\n" +
+	"\bRetagAll\x12\x1d.runespace.v1.RetagAllRequest\x1a\x1e.runespace.v1.RetagAllResponse\x12L\n" +
+	"\tRemoveTag\x12\x1e.runespace.v1.RemoveTagRequest\x1a\x1f.runespace.v1.RemoveTagResponseBCZAgithub.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepbb\x06proto3"
 
 var (
 	file_runespace_v1_runespace_proto_rawDescOnce sync.Once
@@ -1899,7 +2101,7 @@ func file_runespace_v1_runespace_proto_rawDescGZIP() []byte {
 }
 
 var file_runespace_v1_runespace_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_runespace_v1_runespace_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_runespace_v1_runespace_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_runespace_v1_runespace_proto_goTypes = []any{
 	(KeyKind)(0),                       // 0: runespace.v1.KeyKind
 	(*GetInfoRequest)(nil),             // 1: runespace.v1.GetInfoRequest
@@ -1930,6 +2132,10 @@ var file_runespace_v1_runespace_proto_goTypes = []any{
 	(*DeleteResponse)(nil),             // 26: runespace.v1.DeleteResponse
 	(*UpdateTagsRequest)(nil),          // 27: runespace.v1.UpdateTagsRequest
 	(*UpdateTagsResponse)(nil),         // 28: runespace.v1.UpdateTagsResponse
+	(*RetagAllRequest)(nil),            // 29: runespace.v1.RetagAllRequest
+	(*RetagAllResponse)(nil),           // 30: runespace.v1.RetagAllResponse
+	(*RemoveTagRequest)(nil),           // 31: runespace.v1.RemoveTagRequest
+	(*RemoveTagResponse)(nil),          // 32: runespace.v1.RemoveTagResponse
 }
 var file_runespace_v1_runespace_proto_depIdxs = []int32{
 	8,  // 0: runespace.v1.GetInfoResponse.registered_keys:type_name -> runespace.v1.KeyMeta
@@ -1957,16 +2163,20 @@ var file_runespace_v1_runespace_proto_depIdxs = []int32{
 	22, // 22: runespace.v1.RuneSpaceService.GetMetadata:input_type -> runespace.v1.GetMetadataRequest
 	25, // 23: runespace.v1.RuneSpaceService.Delete:input_type -> runespace.v1.DeleteRequest
 	27, // 24: runespace.v1.RuneSpaceService.UpdateTags:input_type -> runespace.v1.UpdateTagsRequest
-	2,  // 25: runespace.v1.RuneSpaceService.GetInfo:output_type -> runespace.v1.GetInfoResponse
-	4,  // 26: runespace.v1.RuneSpaceService.RegisterKeysStream:output_type -> runespace.v1.RegisterKeysStreamResponse
-	12, // 27: runespace.v1.RuneSpaceService.Insert:output_type -> runespace.v1.InsertResponse
-	20, // 28: runespace.v1.RuneSpaceService.Search:output_type -> runespace.v1.SearchResponse
-	15, // 29: runespace.v1.RuneSpaceService.GetCentroids:output_type -> runespace.v1.GetCentroidsChunk
-	23, // 30: runespace.v1.RuneSpaceService.GetMetadata:output_type -> runespace.v1.GetMetadataResponse
-	26, // 31: runespace.v1.RuneSpaceService.Delete:output_type -> runespace.v1.DeleteResponse
-	28, // 32: runespace.v1.RuneSpaceService.UpdateTags:output_type -> runespace.v1.UpdateTagsResponse
-	25, // [25:33] is the sub-list for method output_type
-	17, // [17:25] is the sub-list for method input_type
+	29, // 25: runespace.v1.RuneSpaceService.RetagAll:input_type -> runespace.v1.RetagAllRequest
+	31, // 26: runespace.v1.RuneSpaceService.RemoveTag:input_type -> runespace.v1.RemoveTagRequest
+	2,  // 27: runespace.v1.RuneSpaceService.GetInfo:output_type -> runespace.v1.GetInfoResponse
+	4,  // 28: runespace.v1.RuneSpaceService.RegisterKeysStream:output_type -> runespace.v1.RegisterKeysStreamResponse
+	12, // 29: runespace.v1.RuneSpaceService.Insert:output_type -> runespace.v1.InsertResponse
+	20, // 30: runespace.v1.RuneSpaceService.Search:output_type -> runespace.v1.SearchResponse
+	15, // 31: runespace.v1.RuneSpaceService.GetCentroids:output_type -> runespace.v1.GetCentroidsChunk
+	23, // 32: runespace.v1.RuneSpaceService.GetMetadata:output_type -> runespace.v1.GetMetadataResponse
+	26, // 33: runespace.v1.RuneSpaceService.Delete:output_type -> runespace.v1.DeleteResponse
+	28, // 34: runespace.v1.RuneSpaceService.UpdateTags:output_type -> runespace.v1.UpdateTagsResponse
+	30, // 35: runespace.v1.RuneSpaceService.RetagAll:output_type -> runespace.v1.RetagAllResponse
+	32, // 36: runespace.v1.RuneSpaceService.RemoveTag:output_type -> runespace.v1.RemoveTagResponse
+	27, // [27:37] is the sub-list for method output_type
+	17, // [17:27] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
 	17, // [17:17] is the sub-list for extension extendee
 	0,  // [0:17] is the sub-list for field type_name
@@ -1992,7 +2202,7 @@ func file_runespace_v1_runespace_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_runespace_v1_runespace_proto_rawDesc), len(file_runespace_v1_runespace_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   28,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
