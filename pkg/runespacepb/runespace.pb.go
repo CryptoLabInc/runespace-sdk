@@ -28,6 +28,7 @@ const (
 	KeyKind_KEY_KIND_UNSPECIFIED KeyKind = 0
 	KeyKind_KEY_KIND_RMP_EVAL    KeyKind = 1 // PUBLIC RMP eval key (IP0)
 	KeyKind_KEY_KIND_MM_EVAL     KeyKind = 2 // PUBLIC MM eval key (IP1+)
+	KeyKind_KEY_KIND_LEAN_EVAL   KeyKind = 3 // PUBLIC leancore eval key (dim-major novelty tier)
 )
 
 // Enum value maps for KeyKind.
@@ -36,11 +37,13 @@ var (
 		0: "KEY_KIND_UNSPECIFIED",
 		1: "KEY_KIND_RMP_EVAL",
 		2: "KEY_KIND_MM_EVAL",
+		3: "KEY_KIND_LEAN_EVAL",
 	}
 	KeyKind_value = map[string]int32{
 		"KEY_KIND_UNSPECIFIED": 0,
 		"KEY_KIND_RMP_EVAL":    1,
 		"KEY_KIND_MM_EVAL":     2,
+		"KEY_KIND_LEAN_EVAL":   3,
 	}
 )
 
@@ -219,9 +222,10 @@ func (x *GetInfoResponse) GetStats() *SpaceStats {
 // tombstoned are read from the manifest's in-memory counters (O(1)).
 type SpaceStats struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Rows          uint64                 `protobuf:"varint,1,opt,name=rows,proto3" json:"rows,omitempty"`                      // live (non-tombstoned) items currently indexed
-	MaxRows       uint64                 `protobuf:"varint,2,opt,name=max_rows,json=maxRows,proto3" json:"max_rows,omitempty"` // configured hard cap enforced at insert; 0 = unlimited
-	Tombstoned    uint64                 `protobuf:"varint,3,opt,name=tombstoned,proto3" json:"tombstoned,omitempty"`          // soft-deleted items awaiting physical reclaim
+	Rows          uint64                 `protobuf:"varint,1,opt,name=rows,proto3" json:"rows,omitempty"`                         // live (non-tombstoned) items currently indexed
+	MaxRows       uint64                 `protobuf:"varint,2,opt,name=max_rows,json=maxRows,proto3" json:"max_rows,omitempty"`    // configured hard cap enforced at insert; 0 = unlimited
+	Tombstoned    uint64                 `protobuf:"varint,3,opt,name=tombstoned,proto3" json:"tombstoned,omitempty"`             // soft-deleted items awaiting physical reclaim
+	LeanRows      uint64                 `protobuf:"varint,4,opt,name=lean_rows,json=leanRows,proto3" json:"lean_rows,omitempty"` // items in the dim-major novelty tier (leanspace shards)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -273,6 +277,13 @@ func (x *SpaceStats) GetMaxRows() uint64 {
 func (x *SpaceStats) GetTombstoned() uint64 {
 	if x != nil {
 		return x.Tombstoned
+	}
+	return 0
+}
+
+func (x *SpaceStats) GetLeanRows() uint64 {
+	if x != nil {
+		return x.LeanRows
 	}
 	return 0
 }
@@ -1951,6 +1962,460 @@ func (x *RemoveTagResponse) GetChanged() uint64 {
 	return 0
 }
 
+// PutShardStreamRequest is one frame of a PutShardStream. A shard is sent as
+// exactly one header, its data chunks in order, then one footer.
+type PutShardStreamRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*PutShardStreamRequest_Header
+	//	*PutShardStreamRequest_Data
+	//	*PutShardStreamRequest_Footer
+	Payload       isPutShardStreamRequest_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutShardStreamRequest) Reset() {
+	*x = PutShardStreamRequest{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutShardStreamRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutShardStreamRequest) ProtoMessage() {}
+
+func (x *PutShardStreamRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutShardStreamRequest.ProtoReflect.Descriptor instead.
+func (*PutShardStreamRequest) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *PutShardStreamRequest) GetPayload() isPutShardStreamRequest_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *PutShardStreamRequest) GetHeader() *ShardHeader {
+	if x != nil {
+		if x, ok := x.Payload.(*PutShardStreamRequest_Header); ok {
+			return x.Header
+		}
+	}
+	return nil
+}
+
+func (x *PutShardStreamRequest) GetData() []byte {
+	if x != nil {
+		if x, ok := x.Payload.(*PutShardStreamRequest_Data); ok {
+			return x.Data
+		}
+	}
+	return nil
+}
+
+func (x *PutShardStreamRequest) GetFooter() *ShardFooter {
+	if x != nil {
+		if x, ok := x.Payload.(*PutShardStreamRequest_Footer); ok {
+			return x.Footer
+		}
+	}
+	return nil
+}
+
+type isPutShardStreamRequest_Payload interface {
+	isPutShardStreamRequest_Payload()
+}
+
+type PutShardStreamRequest_Header struct {
+	Header *ShardHeader `protobuf:"bytes,1,opt,name=header,proto3,oneof"`
+}
+
+type PutShardStreamRequest_Data struct {
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3,oneof"` // a contiguous slice of the serialized shard bytes
+}
+
+type PutShardStreamRequest_Footer struct {
+	Footer *ShardFooter `protobuf:"bytes,3,opt,name=footer,proto3,oneof"`
+}
+
+func (*PutShardStreamRequest_Header) isPutShardStreamRequest_Payload() {}
+
+func (*PutShardStreamRequest_Data) isPutShardStreamRequest_Payload() {}
+
+func (*PutShardStreamRequest_Footer) isPutShardStreamRequest_Payload() {}
+
+// ShardHeader opens a shard upload: the client-assigned index (append at the
+// current shard count, or replace an existing shard — the open shard is
+// re-uploaded until it seals) and the full serialized length, which the server
+// fast-fails on mismatch and uses to bound its receive buffer.
+type ShardHeader struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Index         uint32                 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
+	TotalLen      uint64                 `protobuf:"varint,2,opt,name=total_len,json=totalLen,proto3" json:"total_len,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShardHeader) Reset() {
+	*x = ShardHeader{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShardHeader) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShardHeader) ProtoMessage() {}
+
+func (x *ShardHeader) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShardHeader.ProtoReflect.Descriptor instead.
+func (*ShardHeader) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ShardHeader) GetIndex() uint32 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+func (x *ShardHeader) GetTotalLen() uint64 {
+	if x != nil {
+		return x.TotalLen
+	}
+	return 0
+}
+
+type ShardFooter struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sha256        []byte                 `protobuf:"bytes,1,opt,name=sha256,proto3" json:"sha256,omitempty"` // digest over all of the shard's data bytes
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShardFooter) Reset() {
+	*x = ShardFooter{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShardFooter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShardFooter) ProtoMessage() {}
+
+func (x *ShardFooter) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShardFooter.ProtoReflect.Descriptor instead.
+func (*ShardFooter) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ShardFooter) GetSha256() []byte {
+	if x != nil {
+		return x.Sha256
+	}
+	return nil
+}
+
+// PutShardStreamResponse acks a stored shard.
+type PutShardStreamResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Index         uint32                 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
+	Bytes         uint64                 `protobuf:"varint,2,opt,name=bytes,proto3" json:"bytes,omitempty"` // total bytes stored (== ShardHeader.total_len on success)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutShardStreamResponse) Reset() {
+	*x = PutShardStreamResponse{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutShardStreamResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutShardStreamResponse) ProtoMessage() {}
+
+func (x *PutShardStreamResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutShardStreamResponse.ProtoReflect.Descriptor instead.
+func (*PutShardStreamResponse) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *PutShardStreamResponse) GetIndex() uint32 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+func (x *PutShardStreamResponse) GetBytes() uint64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+// NoveltyRequest is a plaintext novelty query over the dim-major tier.
+type NoveltyRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Plaintext query vector (length == the novelty tier's dim). Plaintext to the
+	// keyless server by design (as under PCMM); query privacy is a separate concern.
+	Query         []float64 `protobuf:"fixed64,1,rep,packed,name=query,proto3" json:"query,omitempty"`
+	Tau           float64   `protobuf:"fixed64,2,opt,name=tau,proto3" json:"tau,omitempty"`                 // novelty threshold on the inner product <q, v_i>
+	RBits         uint32    `protobuf:"varint,3,opt,name=r_bits,json=rBits,proto3" json:"r_bits,omitempty"` // per-element blind width (density-dependent ceiling ~8-12)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NoveltyRequest) Reset() {
+	*x = NoveltyRequest{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NoveltyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NoveltyRequest) ProtoMessage() {}
+
+func (x *NoveltyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NoveltyRequest.ProtoReflect.Descriptor instead.
+func (*NoveltyRequest) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *NoveltyRequest) GetQuery() []float64 {
+	if x != nil {
+		return x.Query
+	}
+	return nil
+}
+
+func (x *NoveltyRequest) GetTau() float64 {
+	if x != nil {
+		return x.Tau
+	}
+	return 0
+}
+
+func (x *NoveltyRequest) GetRBits() uint32 {
+	if x != nil {
+		return x.RBits
+	}
+	return 0
+}
+
+// NoveltyResponse carries one sign-only blinded blob per stored shard. The
+// key-holder (Vault) runs RevealCount over each and sums; the server never learns
+// the count.
+type NoveltyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blobs         [][]byte               `protobuf:"bytes,1,rep,name=blobs,proto3" json:"blobs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NoveltyResponse) Reset() {
+	*x = NoveltyResponse{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NoveltyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NoveltyResponse) ProtoMessage() {}
+
+func (x *NoveltyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NoveltyResponse.ProtoReflect.Descriptor instead.
+func (*NoveltyResponse) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *NoveltyResponse) GetBlobs() [][]byte {
+	if x != nil {
+		return x.Blobs
+	}
+	return nil
+}
+
+// RegisterLeanKeyRequest carries the leancore PUBLIC eval-keys blob and its
+// identity/fingerprint. The server verifies eval_key against meta.fingerprint
+// before applying.
+type RegisterLeanKeyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EvalKey       []byte                 `protobuf:"bytes,1,opt,name=eval_key,json=evalKey,proto3" json:"eval_key,omitempty"`
+	Meta          *KeyMeta               `protobuf:"bytes,2,opt,name=meta,proto3" json:"meta,omitempty"` // kind == KEY_KIND_LEAN_EVAL
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterLeanKeyRequest) Reset() {
+	*x = RegisterLeanKeyRequest{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterLeanKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterLeanKeyRequest) ProtoMessage() {}
+
+func (x *RegisterLeanKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterLeanKeyRequest.ProtoReflect.Descriptor instead.
+func (*RegisterLeanKeyRequest) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *RegisterLeanKeyRequest) GetEvalKey() []byte {
+	if x != nil {
+		return x.EvalKey
+	}
+	return nil
+}
+
+func (x *RegisterLeanKeyRequest) GetMeta() *KeyMeta {
+	if x != nil {
+		return x.Meta
+	}
+	return nil
+}
+
+type RegisterLeanKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterLeanKeyResponse) Reset() {
+	*x = RegisterLeanKeyResponse{}
+	mi := &file_runespace_v1_runespace_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterLeanKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterLeanKeyResponse) ProtoMessage() {}
+
+func (x *RegisterLeanKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runespace_v1_runespace_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterLeanKeyResponse.ProtoReflect.Descriptor instead.
+func (*RegisterLeanKeyResponse) Descriptor() ([]byte, []int) {
+	return file_runespace_v1_runespace_proto_rawDescGZIP(), []int{39}
+}
+
 var File_runespace_v1_runespace_proto protoreflect.FileDescriptor
 
 const file_runespace_v1_runespace_proto_rawDesc = "" +
@@ -1966,14 +2431,15 @@ const file_runespace_v1_runespace_proto_rawDesc = "" +
 	"\x10engine_probe_dim\x18\x05 \x01(\rR\x0eengineProbeDim\x12\x14\n" +
 	"\x05ready\x18\x06 \x01(\bR\x05ready\x12>\n" +
 	"\x0fregistered_keys\x18\a \x03(\v2\x15.runespace.v1.KeyMetaR\x0eregisteredKeys\x12.\n" +
-	"\x05stats\x18\b \x01(\v2\x18.runespace.v1.SpaceStatsR\x05stats\"[\n" +
+	"\x05stats\x18\b \x01(\v2\x18.runespace.v1.SpaceStatsR\x05stats\"x\n" +
 	"\n" +
 	"SpaceStats\x12\x12\n" +
 	"\x04rows\x18\x01 \x01(\x04R\x04rows\x12\x19\n" +
 	"\bmax_rows\x18\x02 \x01(\x04R\amaxRows\x12\x1e\n" +
 	"\n" +
 	"tombstoned\x18\x03 \x01(\x04R\n" +
-	"tombstoned\"\x1c\n" +
+	"tombstoned\x12\x1b\n" +
+	"\tlean_rows\x18\x04 \x01(\x04R\bleanRows\"\x1c\n" +
 	"\x1aRegisterKeysStreamResponse\"\xa2\x01\n" +
 	"\x19RegisterKeysStreamRequest\x121\n" +
 	"\x06header\x18\x01 \x01(\v2\x17.runespace.v1.KeyHeaderH\x00R\x06header\x12\x14\n" +
@@ -2070,11 +2536,35 @@ const file_runespace_v1_runespace_proto_rawDesc = "" +
 	"\x10RemoveTagRequest\x12\x10\n" +
 	"\x03tag\x18\x01 \x01(\tR\x03tag\"-\n" +
 	"\x11RemoveTagResponse\x12\x18\n" +
-	"\achanged\x18\x01 \x01(\x04R\achanged*P\n" +
+	"\achanged\x18\x01 \x01(\x04R\achanged\"\xa2\x01\n" +
+	"\x15PutShardStreamRequest\x123\n" +
+	"\x06header\x18\x01 \x01(\v2\x19.runespace.v1.ShardHeaderH\x00R\x06header\x12\x14\n" +
+	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x123\n" +
+	"\x06footer\x18\x03 \x01(\v2\x19.runespace.v1.ShardFooterH\x00R\x06footerB\t\n" +
+	"\apayload\"@\n" +
+	"\vShardHeader\x12\x14\n" +
+	"\x05index\x18\x01 \x01(\rR\x05index\x12\x1b\n" +
+	"\ttotal_len\x18\x02 \x01(\x04R\btotalLen\"%\n" +
+	"\vShardFooter\x12\x16\n" +
+	"\x06sha256\x18\x01 \x01(\fR\x06sha256\"D\n" +
+	"\x16PutShardStreamResponse\x12\x14\n" +
+	"\x05index\x18\x01 \x01(\rR\x05index\x12\x14\n" +
+	"\x05bytes\x18\x02 \x01(\x04R\x05bytes\"O\n" +
+	"\x0eNoveltyRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x03(\x01R\x05query\x12\x10\n" +
+	"\x03tau\x18\x02 \x01(\x01R\x03tau\x12\x15\n" +
+	"\x06r_bits\x18\x03 \x01(\rR\x05rBits\"'\n" +
+	"\x0fNoveltyResponse\x12\x14\n" +
+	"\x05blobs\x18\x01 \x03(\fR\x05blobs\"^\n" +
+	"\x16RegisterLeanKeyRequest\x12\x19\n" +
+	"\beval_key\x18\x01 \x01(\fR\aevalKey\x12)\n" +
+	"\x04meta\x18\x02 \x01(\v2\x15.runespace.v1.KeyMetaR\x04meta\"\x19\n" +
+	"\x17RegisterLeanKeyResponse*h\n" +
 	"\aKeyKind\x12\x18\n" +
 	"\x14KEY_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11KEY_KIND_RMP_EVAL\x10\x01\x12\x14\n" +
-	"\x10KEY_KIND_MM_EVAL\x10\x022\xa8\x06\n" +
+	"\x10KEY_KIND_MM_EVAL\x10\x02\x12\x16\n" +
+	"\x12KEY_KIND_LEAN_EVAL\x10\x032\xaf\b\n" +
 	"\x10RuneSpaceService\x12F\n" +
 	"\aGetInfo\x12\x1c.runespace.v1.GetInfoRequest\x1a\x1d.runespace.v1.GetInfoResponse\x12i\n" +
 	"\x12RegisterKeysStream\x12'.runespace.v1.RegisterKeysStreamRequest\x1a(.runespace.v1.RegisterKeysStreamResponse(\x01\x12C\n" +
@@ -2086,7 +2576,10 @@ const file_runespace_v1_runespace_proto_rawDesc = "" +
 	"\n" +
 	"UpdateTags\x12\x1f.runespace.v1.UpdateTagsRequest\x1a .runespace.v1.UpdateTagsResponse\x12I\n" +
 	"\bRetagAll\x12\x1d.runespace.v1.RetagAllRequest\x1a\x1e.runespace.v1.RetagAllResponse\x12L\n" +
-	"\tRemoveTag\x12\x1e.runespace.v1.RemoveTagRequest\x1a\x1f.runespace.v1.RemoveTagResponseBCZAgithub.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepbb\x06proto3"
+	"\tRemoveTag\x12\x1e.runespace.v1.RemoveTagRequest\x1a\x1f.runespace.v1.RemoveTagResponse\x12]\n" +
+	"\x0ePutShardStream\x12#.runespace.v1.PutShardStreamRequest\x1a$.runespace.v1.PutShardStreamResponse(\x01\x12F\n" +
+	"\aNovelty\x12\x1c.runespace.v1.NoveltyRequest\x1a\x1d.runespace.v1.NoveltyResponse\x12^\n" +
+	"\x0fRegisterLeanKey\x12$.runespace.v1.RegisterLeanKeyRequest\x1a%.runespace.v1.RegisterLeanKeyResponseBCZAgithub.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepbb\x06proto3"
 
 var (
 	file_runespace_v1_runespace_proto_rawDescOnce sync.Once
@@ -2101,7 +2594,7 @@ func file_runespace_v1_runespace_proto_rawDescGZIP() []byte {
 }
 
 var file_runespace_v1_runespace_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_runespace_v1_runespace_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_runespace_v1_runespace_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_runespace_v1_runespace_proto_goTypes = []any{
 	(KeyKind)(0),                       // 0: runespace.v1.KeyKind
 	(*GetInfoRequest)(nil),             // 1: runespace.v1.GetInfoRequest
@@ -2136,6 +2629,14 @@ var file_runespace_v1_runespace_proto_goTypes = []any{
 	(*RetagAllResponse)(nil),           // 30: runespace.v1.RetagAllResponse
 	(*RemoveTagRequest)(nil),           // 31: runespace.v1.RemoveTagRequest
 	(*RemoveTagResponse)(nil),          // 32: runespace.v1.RemoveTagResponse
+	(*PutShardStreamRequest)(nil),      // 33: runespace.v1.PutShardStreamRequest
+	(*ShardHeader)(nil),                // 34: runespace.v1.ShardHeader
+	(*ShardFooter)(nil),                // 35: runespace.v1.ShardFooter
+	(*PutShardStreamResponse)(nil),     // 36: runespace.v1.PutShardStreamResponse
+	(*NoveltyRequest)(nil),             // 37: runespace.v1.NoveltyRequest
+	(*NoveltyResponse)(nil),            // 38: runespace.v1.NoveltyResponse
+	(*RegisterLeanKeyRequest)(nil),     // 39: runespace.v1.RegisterLeanKeyRequest
+	(*RegisterLeanKeyResponse)(nil),    // 40: runespace.v1.RegisterLeanKeyResponse
 }
 var file_runespace_v1_runespace_proto_depIdxs = []int32{
 	8,  // 0: runespace.v1.GetInfoResponse.registered_keys:type_name -> runespace.v1.KeyMeta
@@ -2155,31 +2656,40 @@ var file_runespace_v1_runespace_proto_depIdxs = []int32{
 	21, // 14: runespace.v1.GetMetadataRequest.mm_rows:type_name -> runespace.v1.CellRow
 	24, // 15: runespace.v1.GetMetadataResponse.rmp_entries:type_name -> runespace.v1.MetadataEntry
 	24, // 16: runespace.v1.GetMetadataResponse.mm_entries:type_name -> runespace.v1.MetadataEntry
-	1,  // 17: runespace.v1.RuneSpaceService.GetInfo:input_type -> runespace.v1.GetInfoRequest
-	5,  // 18: runespace.v1.RuneSpaceService.RegisterKeysStream:input_type -> runespace.v1.RegisterKeysStreamRequest
-	9,  // 19: runespace.v1.RuneSpaceService.Insert:input_type -> runespace.v1.InsertRequest
-	18, // 20: runespace.v1.RuneSpaceService.Search:input_type -> runespace.v1.SearchRequest
-	13, // 21: runespace.v1.RuneSpaceService.GetCentroids:input_type -> runespace.v1.GetCentroidsRequest
-	22, // 22: runespace.v1.RuneSpaceService.GetMetadata:input_type -> runespace.v1.GetMetadataRequest
-	25, // 23: runespace.v1.RuneSpaceService.Delete:input_type -> runespace.v1.DeleteRequest
-	27, // 24: runespace.v1.RuneSpaceService.UpdateTags:input_type -> runespace.v1.UpdateTagsRequest
-	29, // 25: runespace.v1.RuneSpaceService.RetagAll:input_type -> runespace.v1.RetagAllRequest
-	31, // 26: runespace.v1.RuneSpaceService.RemoveTag:input_type -> runespace.v1.RemoveTagRequest
-	2,  // 27: runespace.v1.RuneSpaceService.GetInfo:output_type -> runespace.v1.GetInfoResponse
-	4,  // 28: runespace.v1.RuneSpaceService.RegisterKeysStream:output_type -> runespace.v1.RegisterKeysStreamResponse
-	12, // 29: runespace.v1.RuneSpaceService.Insert:output_type -> runespace.v1.InsertResponse
-	20, // 30: runespace.v1.RuneSpaceService.Search:output_type -> runespace.v1.SearchResponse
-	15, // 31: runespace.v1.RuneSpaceService.GetCentroids:output_type -> runespace.v1.GetCentroidsChunk
-	23, // 32: runespace.v1.RuneSpaceService.GetMetadata:output_type -> runespace.v1.GetMetadataResponse
-	26, // 33: runespace.v1.RuneSpaceService.Delete:output_type -> runespace.v1.DeleteResponse
-	28, // 34: runespace.v1.RuneSpaceService.UpdateTags:output_type -> runespace.v1.UpdateTagsResponse
-	30, // 35: runespace.v1.RuneSpaceService.RetagAll:output_type -> runespace.v1.RetagAllResponse
-	32, // 36: runespace.v1.RuneSpaceService.RemoveTag:output_type -> runespace.v1.RemoveTagResponse
-	27, // [27:37] is the sub-list for method output_type
-	17, // [17:27] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	34, // 17: runespace.v1.PutShardStreamRequest.header:type_name -> runespace.v1.ShardHeader
+	35, // 18: runespace.v1.PutShardStreamRequest.footer:type_name -> runespace.v1.ShardFooter
+	8,  // 19: runespace.v1.RegisterLeanKeyRequest.meta:type_name -> runespace.v1.KeyMeta
+	1,  // 20: runespace.v1.RuneSpaceService.GetInfo:input_type -> runespace.v1.GetInfoRequest
+	5,  // 21: runespace.v1.RuneSpaceService.RegisterKeysStream:input_type -> runespace.v1.RegisterKeysStreamRequest
+	9,  // 22: runespace.v1.RuneSpaceService.Insert:input_type -> runespace.v1.InsertRequest
+	18, // 23: runespace.v1.RuneSpaceService.Search:input_type -> runespace.v1.SearchRequest
+	13, // 24: runespace.v1.RuneSpaceService.GetCentroids:input_type -> runespace.v1.GetCentroidsRequest
+	22, // 25: runespace.v1.RuneSpaceService.GetMetadata:input_type -> runespace.v1.GetMetadataRequest
+	25, // 26: runespace.v1.RuneSpaceService.Delete:input_type -> runespace.v1.DeleteRequest
+	27, // 27: runespace.v1.RuneSpaceService.UpdateTags:input_type -> runespace.v1.UpdateTagsRequest
+	29, // 28: runespace.v1.RuneSpaceService.RetagAll:input_type -> runespace.v1.RetagAllRequest
+	31, // 29: runespace.v1.RuneSpaceService.RemoveTag:input_type -> runespace.v1.RemoveTagRequest
+	33, // 30: runespace.v1.RuneSpaceService.PutShardStream:input_type -> runespace.v1.PutShardStreamRequest
+	37, // 31: runespace.v1.RuneSpaceService.Novelty:input_type -> runespace.v1.NoveltyRequest
+	39, // 32: runespace.v1.RuneSpaceService.RegisterLeanKey:input_type -> runespace.v1.RegisterLeanKeyRequest
+	2,  // 33: runespace.v1.RuneSpaceService.GetInfo:output_type -> runespace.v1.GetInfoResponse
+	4,  // 34: runespace.v1.RuneSpaceService.RegisterKeysStream:output_type -> runespace.v1.RegisterKeysStreamResponse
+	12, // 35: runespace.v1.RuneSpaceService.Insert:output_type -> runespace.v1.InsertResponse
+	20, // 36: runespace.v1.RuneSpaceService.Search:output_type -> runespace.v1.SearchResponse
+	15, // 37: runespace.v1.RuneSpaceService.GetCentroids:output_type -> runespace.v1.GetCentroidsChunk
+	23, // 38: runespace.v1.RuneSpaceService.GetMetadata:output_type -> runespace.v1.GetMetadataResponse
+	26, // 39: runespace.v1.RuneSpaceService.Delete:output_type -> runespace.v1.DeleteResponse
+	28, // 40: runespace.v1.RuneSpaceService.UpdateTags:output_type -> runespace.v1.UpdateTagsResponse
+	30, // 41: runespace.v1.RuneSpaceService.RetagAll:output_type -> runespace.v1.RetagAllResponse
+	32, // 42: runespace.v1.RuneSpaceService.RemoveTag:output_type -> runespace.v1.RemoveTagResponse
+	36, // 43: runespace.v1.RuneSpaceService.PutShardStream:output_type -> runespace.v1.PutShardStreamResponse
+	38, // 44: runespace.v1.RuneSpaceService.Novelty:output_type -> runespace.v1.NoveltyResponse
+	40, // 45: runespace.v1.RuneSpaceService.RegisterLeanKey:output_type -> runespace.v1.RegisterLeanKeyResponse
+	33, // [33:46] is the sub-list for method output_type
+	20, // [20:33] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_runespace_v1_runespace_proto_init() }
@@ -2196,13 +2706,18 @@ func file_runespace_v1_runespace_proto_init() {
 		(*GetCentroidsChunk_Header)(nil),
 		(*GetCentroidsChunk_Batch)(nil),
 	}
+	file_runespace_v1_runespace_proto_msgTypes[32].OneofWrappers = []any{
+		(*PutShardStreamRequest_Header)(nil),
+		(*PutShardStreamRequest_Data)(nil),
+		(*PutShardStreamRequest_Footer)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_runespace_v1_runespace_proto_rawDesc), len(file_runespace_v1_runespace_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   32,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

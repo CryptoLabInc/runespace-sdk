@@ -71,6 +71,35 @@ service RuneSpaceService {
   // applied per item (memory-first then durable) like UpdateTags. Idempotent and
   // re-runnable.
   rpc RemoveTag(RemoveTagRequest) returns (RemoveTagResponse);
+
+  // --- Novelty tier (dim-major leancore; additive, independent of the evi
+  // retrieval tiers above and gated on KEY_KIND_LEAN_EVAL) ---
+
+  // PutShardStream uploads one client-encrypted dim-major shard at a
+  // client-assigned index. The key-holder (Vault) transposes vectors in clear,
+  // encrypts each dimension as a SLOT column, and serializes the shard; the
+  // keyless server stores and scores it, never seeing a plaintext vector. A shard
+  // is many MB (d full-chain columns), so it streams: one header (index +
+  // total_len), data chunks in order, then a footer carrying a sha256 the server
+  // verifies before deserializing. Sealed shards are immutable; the open shard is
+  // re-uploaded at its index on each insert until it seals.
+  rpc PutShardStream(stream PutShardStreamRequest) returns (PutShardStreamResponse);
+
+  // Novelty scores a plaintext query against every stored shard and returns one
+  // sign-only blinded blob per shard. The query is plaintext to the keyless server
+  // (as under PCMM). The server cannot reveal the result — the key-holder (Vault)
+  // runs RevealCount over each blob and sums to a novelty count, so the server
+  // learns neither the scores nor the count. Separate from Search: a different
+  // query type (plaintext doubles + threshold + blind width), and a count rather
+  // than top-m score blobs.
+  rpc Novelty(NoveltyRequest) returns (NoveltyResponse);
+
+  // RegisterLeanKey loads the PUBLIC leancore eval key (dim-major novelty tier)
+  // and persists it to the PV, opening the novelty data plane. Independent of the
+  // evi RMP+MM registration (a novelty-only instance registers only this). The key
+  // is small (an encryption key; the key-switch-free tier ships no rotation keys),
+  // so it is unary. One-shot; re-registering the identical key is a no-op.
+  rpc RegisterLeanKey(RegisterLeanKeyRequest) returns (RegisterLeanKeyResponse);
 }
 
 message GetInfoRequest {}
@@ -104,6 +133,7 @@ message SpaceStats {
   uint64 rows = 1;       // live (non-tombstoned) items currently indexed
   uint64 max_rows = 2;   // configured hard cap enforced at insert; 0 = unlimited
   uint64 tombstoned = 3; // soft-deleted items awaiting physical reclaim
+  uint64 lean_rows = 4;  // items in the dim-major novelty tier (leanspace shards)
 }
 
 message RegisterKeysStreamResponse {}
@@ -111,8 +141,9 @@ message RegisterKeysStreamResponse {}
 // KeyKind identifies which eval key a RegisterKeysStream sequence carries.
 enum KeyKind {
   KEY_KIND_UNSPECIFIED = 0;
-  KEY_KIND_RMP_EVAL = 1; // PUBLIC RMP eval key (IP0)
-  KEY_KIND_MM_EVAL = 2;  // PUBLIC MM eval key (IP1+)
+  KEY_KIND_RMP_EVAL = 1;  // PUBLIC RMP eval key (IP0)
+  KEY_KIND_MM_EVAL = 2;   // PUBLIC MM eval key (IP1+)
+  KEY_KIND_LEAN_EVAL = 3; // PUBLIC leancore eval key (dim-major novelty tier)
 }
 
 // RegisterKeysStreamRequest is one frame of a RegisterKeysStream. Each key is
@@ -368,3 +399,60 @@ message RemoveTagRequest {
 message RemoveTagResponse {
   uint64 changed = 1;
 }
+
+// --- Novelty tier messages (dim-major leancore) ---
+
+// PutShardStreamRequest is one frame of a PutShardStream. A shard is sent as
+// exactly one header, its data chunks in order, then one footer.
+message PutShardStreamRequest {
+  oneof payload {
+    ShardHeader header = 1;
+    bytes data = 2; // a contiguous slice of the serialized shard bytes
+    ShardFooter footer = 3;
+  }
+}
+
+// ShardHeader opens a shard upload: the client-assigned index (append at the
+// current shard count, or replace an existing shard — the open shard is
+// re-uploaded until it seals) and the full serialized length, which the server
+// fast-fails on mismatch and uses to bound its receive buffer.
+message ShardHeader {
+  uint32 index = 1;
+  uint64 total_len = 2;
+}
+
+message ShardFooter {
+  bytes sha256 = 1; // digest over all of the shard's data bytes
+}
+
+// PutShardStreamResponse acks a stored shard.
+message PutShardStreamResponse {
+  uint32 index = 1;
+  uint64 bytes = 2; // total bytes stored (== ShardHeader.total_len on success)
+}
+
+// NoveltyRequest is a plaintext novelty query over the dim-major tier.
+message NoveltyRequest {
+  // Plaintext query vector (length == the novelty tier's dim). Plaintext to the
+  // keyless server by design (as under PCMM); query privacy is a separate concern.
+  repeated double query = 1;
+  double tau = 2;    // novelty threshold on the inner product <q, v_i>
+  uint32 r_bits = 3; // per-element blind width (density-dependent ceiling ~8-12)
+}
+
+// NoveltyResponse carries one sign-only blinded blob per stored shard. The
+// key-holder (Vault) runs RevealCount over each and sums; the server never learns
+// the count.
+message NoveltyResponse {
+  repeated bytes blobs = 1;
+}
+
+// RegisterLeanKeyRequest carries the leancore PUBLIC eval-keys blob and its
+// identity/fingerprint. The server verifies eval_key against meta.fingerprint
+// before applying.
+message RegisterLeanKeyRequest {
+  bytes eval_key = 1;
+  KeyMeta meta = 2; // kind == KEY_KIND_LEAN_EVAL
+}
+
+message RegisterLeanKeyResponse {}

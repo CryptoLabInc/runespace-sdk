@@ -29,6 +29,9 @@ const (
 	RuneSpaceService_UpdateTags_FullMethodName         = "/runespace.v1.RuneSpaceService/UpdateTags"
 	RuneSpaceService_RetagAll_FullMethodName           = "/runespace.v1.RuneSpaceService/RetagAll"
 	RuneSpaceService_RemoveTag_FullMethodName          = "/runespace.v1.RuneSpaceService/RemoveTag"
+	RuneSpaceService_PutShardStream_FullMethodName     = "/runespace.v1.RuneSpaceService/PutShardStream"
+	RuneSpaceService_Novelty_FullMethodName            = "/runespace.v1.RuneSpaceService/Novelty"
+	RuneSpaceService_RegisterLeanKey_FullMethodName    = "/runespace.v1.RuneSpaceService/RegisterLeanKey"
 )
 
 // RuneSpaceServiceClient is the client API for RuneSpaceService service.
@@ -93,6 +96,29 @@ type RuneSpaceServiceClient interface {
 	// applied per item (memory-first then durable) like UpdateTags. Idempotent and
 	// re-runnable.
 	RemoveTag(ctx context.Context, in *RemoveTagRequest, opts ...grpc.CallOption) (*RemoveTagResponse, error)
+	// PutShardStream uploads one client-encrypted dim-major shard at a
+	// client-assigned index. The key-holder (Vault) transposes vectors in clear,
+	// encrypts each dimension as a SLOT column, and serializes the shard; the
+	// keyless server stores and scores it, never seeing a plaintext vector. A shard
+	// is many MB (d full-chain columns), so it streams: one header (index +
+	// total_len), data chunks in order, then a footer carrying a sha256 the server
+	// verifies before deserializing. Sealed shards are immutable; the open shard is
+	// re-uploaded at its index on each insert until it seals.
+	PutShardStream(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[PutShardStreamRequest, PutShardStreamResponse], error)
+	// Novelty scores a plaintext query against every stored shard and returns one
+	// sign-only blinded blob per shard. The query is plaintext to the keyless server
+	// (as under PCMM). The server cannot reveal the result — the key-holder (Vault)
+	// runs RevealCount over each blob and sums to a novelty count, so the server
+	// learns neither the scores nor the count. Separate from Search: a different
+	// query type (plaintext doubles + threshold + blind width), and a count rather
+	// than top-m score blobs.
+	Novelty(ctx context.Context, in *NoveltyRequest, opts ...grpc.CallOption) (*NoveltyResponse, error)
+	// RegisterLeanKey loads the PUBLIC leancore eval key (dim-major novelty tier)
+	// and persists it to the PV, opening the novelty data plane. Independent of the
+	// evi RMP+MM registration (a novelty-only instance registers only this). The key
+	// is small (an encryption key; the key-switch-free tier ships no rotation keys),
+	// so it is unary. One-shot; re-registering the identical key is a no-op.
+	RegisterLeanKey(ctx context.Context, in *RegisterLeanKeyRequest, opts ...grpc.CallOption) (*RegisterLeanKeyResponse, error)
 }
 
 type runeSpaceServiceClient struct {
@@ -215,6 +241,39 @@ func (c *runeSpaceServiceClient) RemoveTag(ctx context.Context, in *RemoveTagReq
 	return out, nil
 }
 
+func (c *runeSpaceServiceClient) PutShardStream(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[PutShardStreamRequest, PutShardStreamResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &RuneSpaceService_ServiceDesc.Streams[2], RuneSpaceService_PutShardStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PutShardStreamRequest, PutShardStreamResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuneSpaceService_PutShardStreamClient = grpc.ClientStreamingClient[PutShardStreamRequest, PutShardStreamResponse]
+
+func (c *runeSpaceServiceClient) Novelty(ctx context.Context, in *NoveltyRequest, opts ...grpc.CallOption) (*NoveltyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NoveltyResponse)
+	err := c.cc.Invoke(ctx, RuneSpaceService_Novelty_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runeSpaceServiceClient) RegisterLeanKey(ctx context.Context, in *RegisterLeanKeyRequest, opts ...grpc.CallOption) (*RegisterLeanKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterLeanKeyResponse)
+	err := c.cc.Invoke(ctx, RuneSpaceService_RegisterLeanKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RuneSpaceServiceServer is the server API for RuneSpaceService service.
 // All implementations must embed UnimplementedRuneSpaceServiceServer
 // for forward compatibility.
@@ -277,6 +336,29 @@ type RuneSpaceServiceServer interface {
 	// applied per item (memory-first then durable) like UpdateTags. Idempotent and
 	// re-runnable.
 	RemoveTag(context.Context, *RemoveTagRequest) (*RemoveTagResponse, error)
+	// PutShardStream uploads one client-encrypted dim-major shard at a
+	// client-assigned index. The key-holder (Vault) transposes vectors in clear,
+	// encrypts each dimension as a SLOT column, and serializes the shard; the
+	// keyless server stores and scores it, never seeing a plaintext vector. A shard
+	// is many MB (d full-chain columns), so it streams: one header (index +
+	// total_len), data chunks in order, then a footer carrying a sha256 the server
+	// verifies before deserializing. Sealed shards are immutable; the open shard is
+	// re-uploaded at its index on each insert until it seals.
+	PutShardStream(grpc.ClientStreamingServer[PutShardStreamRequest, PutShardStreamResponse]) error
+	// Novelty scores a plaintext query against every stored shard and returns one
+	// sign-only blinded blob per shard. The query is plaintext to the keyless server
+	// (as under PCMM). The server cannot reveal the result — the key-holder (Vault)
+	// runs RevealCount over each blob and sums to a novelty count, so the server
+	// learns neither the scores nor the count. Separate from Search: a different
+	// query type (plaintext doubles + threshold + blind width), and a count rather
+	// than top-m score blobs.
+	Novelty(context.Context, *NoveltyRequest) (*NoveltyResponse, error)
+	// RegisterLeanKey loads the PUBLIC leancore eval key (dim-major novelty tier)
+	// and persists it to the PV, opening the novelty data plane. Independent of the
+	// evi RMP+MM registration (a novelty-only instance registers only this). The key
+	// is small (an encryption key; the key-switch-free tier ships no rotation keys),
+	// so it is unary. One-shot; re-registering the identical key is a no-op.
+	RegisterLeanKey(context.Context, *RegisterLeanKeyRequest) (*RegisterLeanKeyResponse, error)
 	mustEmbedUnimplementedRuneSpaceServiceServer()
 }
 
@@ -316,6 +398,15 @@ func (UnimplementedRuneSpaceServiceServer) RetagAll(context.Context, *RetagAllRe
 }
 func (UnimplementedRuneSpaceServiceServer) RemoveTag(context.Context, *RemoveTagRequest) (*RemoveTagResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveTag not implemented")
+}
+func (UnimplementedRuneSpaceServiceServer) PutShardStream(grpc.ClientStreamingServer[PutShardStreamRequest, PutShardStreamResponse]) error {
+	return status.Error(codes.Unimplemented, "method PutShardStream not implemented")
+}
+func (UnimplementedRuneSpaceServiceServer) Novelty(context.Context, *NoveltyRequest) (*NoveltyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Novelty not implemented")
+}
+func (UnimplementedRuneSpaceServiceServer) RegisterLeanKey(context.Context, *RegisterLeanKeyRequest) (*RegisterLeanKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterLeanKey not implemented")
 }
 func (UnimplementedRuneSpaceServiceServer) mustEmbedUnimplementedRuneSpaceServiceServer() {}
 func (UnimplementedRuneSpaceServiceServer) testEmbeddedByValue()                          {}
@@ -500,6 +591,49 @@ func _RuneSpaceService_RemoveTag_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RuneSpaceService_PutShardStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(RuneSpaceServiceServer).PutShardStream(&grpc.GenericServerStream[PutShardStreamRequest, PutShardStreamResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RuneSpaceService_PutShardStreamServer = grpc.ClientStreamingServer[PutShardStreamRequest, PutShardStreamResponse]
+
+func _RuneSpaceService_Novelty_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NoveltyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuneSpaceServiceServer).Novelty(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuneSpaceService_Novelty_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuneSpaceServiceServer).Novelty(ctx, req.(*NoveltyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RuneSpaceService_RegisterLeanKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterLeanKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuneSpaceServiceServer).RegisterLeanKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuneSpaceService_RegisterLeanKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuneSpaceServiceServer).RegisterLeanKey(ctx, req.(*RegisterLeanKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RuneSpaceService_ServiceDesc is the grpc.ServiceDesc for RuneSpaceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -539,6 +673,14 @@ var RuneSpaceService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "RemoveTag",
 			Handler:    _RuneSpaceService_RemoveTag_Handler,
 		},
+		{
+			MethodName: "Novelty",
+			Handler:    _RuneSpaceService_Novelty_Handler,
+		},
+		{
+			MethodName: "RegisterLeanKey",
+			Handler:    _RuneSpaceService_RegisterLeanKey_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -550,6 +692,11 @@ var RuneSpaceService_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "GetCentroids",
 			Handler:       _RuneSpaceService_GetCentroids_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "PutShardStream",
+			Handler:       _RuneSpaceService_PutShardStream_Handler,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "runespace/v1/runespace.proto",

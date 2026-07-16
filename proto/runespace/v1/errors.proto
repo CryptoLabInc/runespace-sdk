@@ -23,6 +23,7 @@ enum ErrorReason {
   ERROR_REASON_INVALID_CLUSTER_ID = 8;     // cluster_id outside [0, nlist) on a cluster insert
   ERROR_REASON_CENTROID_VERSION_MISMATCH = 9; // insert's centroid_set_version != the loaded set
   ERROR_REASON_INVALID_TAG = 14;           // a required filter-tag arg is empty, or RetagAll from == to
+  ERROR_REASON_SHARD_INTEGRITY = 15;       // an uploaded novelty shard failed its length/sha256 check
 
   // FAILED_PRECONDITION — server state.
   ERROR_REASON_KEYS_NOT_REGISTERED = 10;

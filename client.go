@@ -174,6 +174,10 @@ func keyKindName(k pb.KeyKind) string {
 		return rmpKind.name
 	case pb.KeyKind_KEY_KIND_MM_EVAL:
 		return mmKind.name
+	case pb.KeyKind_KEY_KIND_LEAN_EVAL:
+		// Reported, not managed: the novelty tier's key has no on-disk kind here
+		// yet because this SDK cannot generate one (see novelty.go).
+		return "lean"
 	default:
 		return "unknown"
 	}

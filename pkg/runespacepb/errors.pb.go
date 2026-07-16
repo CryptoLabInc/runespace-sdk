@@ -41,6 +41,7 @@ const (
 	ErrorReason_ERROR_REASON_INVALID_CLUSTER_ID        ErrorReason = 8  // cluster_id outside [0, nlist) on a cluster insert
 	ErrorReason_ERROR_REASON_CENTROID_VERSION_MISMATCH ErrorReason = 9  // insert's centroid_set_version != the loaded set
 	ErrorReason_ERROR_REASON_INVALID_TAG               ErrorReason = 14 // a required filter-tag arg is empty, or RetagAll from == to
+	ErrorReason_ERROR_REASON_SHARD_INTEGRITY           ErrorReason = 15 // an uploaded novelty shard failed its length/sha256 check
 	// FAILED_PRECONDITION — server state.
 	ErrorReason_ERROR_REASON_KEYS_NOT_REGISTERED      ErrorReason = 10
 	ErrorReason_ERROR_REASON_KEY_ROTATION_UNSUPPORTED ErrorReason = 11
@@ -72,6 +73,7 @@ var (
 		8:  "ERROR_REASON_INVALID_CLUSTER_ID",
 		9:  "ERROR_REASON_CENTROID_VERSION_MISMATCH",
 		14: "ERROR_REASON_INVALID_TAG",
+		15: "ERROR_REASON_SHARD_INTEGRITY",
 		10: "ERROR_REASON_KEYS_NOT_REGISTERED",
 		11: "ERROR_REASON_KEY_ROTATION_UNSUPPORTED",
 		12: "ERROR_REASON_CLUSTER_NOT_CONFIGURED",
@@ -95,6 +97,7 @@ var (
 		"ERROR_REASON_INVALID_CLUSTER_ID":        8,
 		"ERROR_REASON_CENTROID_VERSION_MISMATCH": 9,
 		"ERROR_REASON_INVALID_TAG":               14,
+		"ERROR_REASON_SHARD_INTEGRITY":           15,
 		"ERROR_REASON_KEYS_NOT_REGISTERED":       10,
 		"ERROR_REASON_KEY_ROTATION_UNSUPPORTED":  11,
 		"ERROR_REASON_CLUSTER_NOT_CONFIGURED":    12,
@@ -138,7 +141,7 @@ var File_runespace_v1_errors_proto protoreflect.FileDescriptor
 
 const file_runespace_v1_errors_proto_rawDesc = "" +
 	"\n" +
-	"\x19runespace/v1/errors.proto\x12\frunespace.v1*\xe3\x05\n" +
+	"\x19runespace/v1/errors.proto\x12\frunespace.v1*\x85\x06\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17ERROR_REASON_INVALID_ID\x10\x01\x12!\n" +
@@ -151,7 +154,8 @@ const file_runespace_v1_errors_proto_rawDesc = "" +
 	"\x1fERROR_REASON_EVAL_KEY_INTEGRITY\x10\a\x12#\n" +
 	"\x1fERROR_REASON_INVALID_CLUSTER_ID\x10\b\x12*\n" +
 	"&ERROR_REASON_CENTROID_VERSION_MISMATCH\x10\t\x12\x1c\n" +
-	"\x18ERROR_REASON_INVALID_TAG\x10\x0e\x12$\n" +
+	"\x18ERROR_REASON_INVALID_TAG\x10\x0e\x12 \n" +
+	"\x1cERROR_REASON_SHARD_INTEGRITY\x10\x0f\x12$\n" +
 	" ERROR_REASON_KEYS_NOT_REGISTERED\x10\n" +
 	"\x12)\n" +
 	"%ERROR_REASON_KEY_ROTATION_UNSUPPORTED\x10\v\x12'\n" +
