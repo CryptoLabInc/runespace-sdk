@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -81,4 +82,43 @@ func TestKeyParts(t *testing.T) {
 			t.Errorf("MM eval key missing: %v", err)
 		}
 	})
+}
+
+// TestKeysConcurrentCrypto is the regression test for the per-bundle cryptoMu:
+// concurrent encrypts on the shared RMP/MM bundles, with a Close racing in
+// while calls are still in flight. Without the bundle-level serialization the
+// concurrent calls hit the shared evi context together (native fault under
+// load, SIGBUS in production) and the unlocked enc/dec nil-check races with
+// close(). Run with -race: calls must either succeed or fail with the guard
+// error — never panic, fault, or trip the race detector.
+func TestKeysConcurrentCrypto(t *testing.T) {
+	dir := t.TempDir()
+	base := []KeysOption{WithKeyPath(dir), WithKeyID("conc"), WithKeyDim(128)}
+	if err := GenerateKeys(base...); err != nil {
+		t.Fatalf("GenerateKeys: %v", err)
+	}
+	k, err := OpenKeys(base...)
+	if err != nil {
+		t.Fatalf("OpenKeys: %v", err)
+	}
+
+	const workers, iters = 8, 25
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iters; i++ {
+				if _, err := k.EncryptFlat(vec128()); err != nil && !errors.Is(err, ErrKeysNotForEncrypt) {
+					t.Errorf("EncryptFlat: %v", err)
+				}
+				if _, err := k.EncryptClustered(vec128()); err != nil && !errors.Is(err, ErrKeysNotForEncrypt) {
+					t.Errorf("EncryptClustered: %v", err)
+				}
+			}
+		}()
+	}
+	wg.Add(1)
+	go func() { defer wg.Done(); _ = k.Close() }()
+	wg.Wait()
 }
