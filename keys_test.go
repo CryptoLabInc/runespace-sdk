@@ -72,9 +72,9 @@ func TestKeyParts(t *testing.T) {
 	t.Run("EvalKeysOnDisk", func(t *testing.T) {
 		// RegisterKeys streams these from disk. Eval keys are kept raw (the
 		// KeyPack saver's format, which the homevaluator loads via buffer; the
-		// KeyManager JSON envelope cannot round-trip it) for both the RMP (root)
+		// KeyManager JSON envelope cannot round-trip it) for both the RMP (rmp/)
 		// and MM (mm/) bundles.
-		if _, err := os.Stat(filepath.Join(dir, evalKeyBinFile)); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, rmpKind.subdir, evalKeyBinFile)); err != nil {
 			t.Errorf("RMP eval key missing: %v", err)
 		}
 		if _, err := os.Stat(filepath.Join(dir, mmKind.subdir, evalKeyBinFile)); err != nil {
