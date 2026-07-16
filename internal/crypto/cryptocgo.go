@@ -33,10 +33,11 @@ package crypto
 // by evi_seal_info_create (which KeyGenerator and Decryptor both call,
 // even at seal_mode=NONE), so -lssl -lcrypto are required at link time
 // regardless of whether the SDK ever constructs a non-NONE seal. On
-// macOS the Homebrew openssl@3 prefix differs between Apple Silicon and
-// Intel; both search paths are supplied so the linker picks whichever
-// exists. Linux assumes system libssl-dev. Windows assumes MSYS2
-// mingw-w64-x86_64-openssl.
+// macOS/arm64 the openssl@3 prefix is the Apple Silicon Homebrew path
+// (/opt/homebrew); the C++ runtime (-lc++) is not listed because the Go
+// toolchain adds it automatically for packages that compile C++ (the
+// .cpp shims here). Linux assumes system libssl-dev. Windows assumes
+// MSYS2 mingw-w64-x86_64-openssl.
 // EVI_STATIC tells EVI/Export.hpp to leave EVI_API empty on all
 // platforms. We link against the bundled static archives
 // (libevi_c_api.a, libevi_crypto.a), so Windows must not treat the
@@ -45,7 +46,7 @@ package crypto
 // references that the static archive does not provide.
 #cgo CPPFLAGS: -I${SRCDIR}/../../third_party/evi/include -DEVI_STATIC
 #cgo CXXFLAGS: -std=c++17
-#cgo darwin,arm64  LDFLAGS: -L${SRCDIR}/../../third_party/evi/darwin_arm64/lib  -levi_c_api -levi_crypto -ldeb -lalea -L/opt/homebrew/opt/openssl@3/lib -L/usr/local/opt/openssl@3/lib -lssl -lcrypto -lc++ -lm
+#cgo darwin,arm64  LDFLAGS: -L${SRCDIR}/../../third_party/evi/darwin_arm64/lib  -levi_c_api -levi_crypto -ldeb -lalea -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto -lm
 #cgo linux,amd64   LDFLAGS: -L${SRCDIR}/../../third_party/evi/linux_amd64/lib   -levi_c_api -levi_crypto -ldeb -lalea -lssl -lcrypto -lstdc++ -lm
 #cgo linux,arm64   LDFLAGS: -L${SRCDIR}/../../third_party/evi/linux_arm64/lib   -levi_c_api -levi_crypto -ldeb -lalea -lssl -lcrypto -lstdc++ -lm
 #cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../../third_party/evi/windows_amd64/lib -levi_c_api -levi_crypto -ldeb -lalea -lssl -lcrypto -lstdc++ -lm -lws2_32 -lcrypt32
