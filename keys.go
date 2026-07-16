@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/CryptoLabInc/runespace-sdk/internal/crypto"
 )
@@ -60,12 +61,24 @@ type keyBundle struct {
 	ckks crypto.CKKSContext
 	enc  crypto.Encryptor
 	dec  crypto.Decryptor
+
+	// cryptoMu serializes every cgo crypto call that touches this bundle's
+	// evi context (ckks). enc and dec are built from the SAME context, and the
+	// underlying evi encryptor/decryptor are not reentrant: two concurrent
+	// encrypt/decrypt calls on one context fault natively (SIGBUS). The
+	// per-object RWMutex inside cgoEncryptor/cgoDecryptor only guards against
+	// Close freeing objects mid-call (it takes RLock, so it permits concurrent
+	// calls) — it does NOT serialize the cgo work. This mutex does, at
+	// context granularity, so the RMP and MM bundles still run in parallel.
+	cryptoMu sync.Mutex
 }
 
 func (b *keyBundle) close() {
 	if b == nil {
 		return
 	}
+	b.cryptoMu.Lock()
+	defer b.cryptoMu.Unlock()
 	if b.enc != nil {
 		_ = b.enc.Close()
 		b.enc = nil
@@ -106,6 +119,8 @@ func (k *Keys) EncryptFlat(vec []float32) ([]byte, error) {
 	if k == nil || k.rmp == nil || k.rmp.enc == nil {
 		return nil, ErrKeysNotForEncrypt
 	}
+	k.rmp.cryptoMu.Lock()
+	defer k.rmp.cryptoMu.Unlock()
 	return k.rmp.enc.EncryptSingle(vec, "item")
 }
 
@@ -118,6 +133,8 @@ func (k *Keys) EncryptClustered(vec []float32) ([]byte, error) {
 	if k == nil || k.mm == nil || k.mm.enc == nil {
 		return nil, ErrKeysNotForEncrypt
 	}
+	k.mm.cryptoMu.Lock()
+	defer k.mm.cryptoMu.Unlock()
 	return k.mm.enc.EncryptRow(vec, "item", 1)
 }
 
@@ -132,6 +149,8 @@ func (k *Keys) DecryptResult(result []byte) ([]float64, error) {
 	if k == nil || k.rmp == nil || k.rmp.dec == nil {
 		return nil, ErrKeysNotForDecrypt
 	}
+	k.rmp.cryptoMu.Lock()
+	defer k.rmp.cryptoMu.Unlock()
 	return k.rmp.dec.DecryptSearchResult(result)
 }
 
@@ -141,6 +160,8 @@ func (k *Keys) DecryptClustered(result []byte) ([]float64, error) {
 	if k == nil || k.mm == nil || k.mm.dec == nil {
 		return nil, ErrKeysNotForDecrypt
 	}
+	k.mm.cryptoMu.Lock()
+	defer k.mm.cryptoMu.Unlock()
 	return k.mm.dec.DecryptSearchResult(result)
 }
 
