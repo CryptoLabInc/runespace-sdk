@@ -116,11 +116,14 @@ func (k *Keys) Dim() int { return k.dim }
 // EncryptFlat FHE-encrypts one embedding into the ITEM-encoded evi bytes that
 // Client.Insert sends as rmp_item — the flat (RMP) tier's per-item wire form.
 func (k *Keys) EncryptFlat(vec []float32) ([]byte, error) {
-	if k == nil || k.rmp == nil || k.rmp.enc == nil {
+	if k == nil || k.rmp == nil {
 		return nil, ErrKeysNotForEncrypt
 	}
 	k.rmp.cryptoMu.Lock()
 	defer k.rmp.cryptoMu.Unlock()
+	if k.rmp.enc == nil { // re-check under the lock: close() nils it under cryptoMu
+		return nil, ErrKeysNotForEncrypt
+	}
 	return k.rmp.enc.EncryptSingle(vec, "item")
 }
 
@@ -130,11 +133,14 @@ func (k *Keys) EncryptFlat(vec []float32) ([]byte, error) {
 // row), not the RMP batch path. level 1 selects the DB scale the server's
 // make_searchable rescales to level 0 at compaction.
 func (k *Keys) EncryptClustered(vec []float32) ([]byte, error) {
-	if k == nil || k.mm == nil || k.mm.enc == nil {
+	if k == nil || k.mm == nil {
 		return nil, ErrKeysNotForEncrypt
 	}
 	k.mm.cryptoMu.Lock()
 	defer k.mm.cryptoMu.Unlock()
+	if k.mm.enc == nil { // re-check under the lock: close() nils it under cryptoMu
+		return nil, ErrKeysNotForEncrypt
+	}
 	return k.mm.enc.EncryptRow(vec, "item", 1)
 }
 
@@ -146,22 +152,28 @@ func (k *Keys) EncryptClustered(vec []float32) ([]byte, error) {
 // DecryptResult decrypts a flat (RMP) Search response blob into per-slot
 // inner-product scores. scores[i] is the score for index slot i.
 func (k *Keys) DecryptResult(result []byte) ([]float64, error) {
-	if k == nil || k.rmp == nil || k.rmp.dec == nil {
+	if k == nil || k.rmp == nil {
 		return nil, ErrKeysNotForDecrypt
 	}
 	k.rmp.cryptoMu.Lock()
 	defer k.rmp.cryptoMu.Unlock()
+	if k.rmp.dec == nil { // re-check under the lock: close() nils it under cryptoMu
+		return nil, ErrKeysNotForDecrypt
+	}
 	return k.rmp.dec.DecryptSearchResult(result)
 }
 
 // DecryptClustered decrypts one clustered (MM) cluster_result blob into per-row
 // inner-product scores. scores[r] is the score for (cluster, row r).
 func (k *Keys) DecryptClustered(result []byte) ([]float64, error) {
-	if k == nil || k.mm == nil || k.mm.dec == nil {
+	if k == nil || k.mm == nil {
 		return nil, ErrKeysNotForDecrypt
 	}
 	k.mm.cryptoMu.Lock()
 	defer k.mm.cryptoMu.Unlock()
+	if k.mm.dec == nil { // re-check under the lock: close() nils it under cryptoMu
+		return nil, ErrKeysNotForDecrypt
+	}
 	return k.mm.dec.DecryptSearchResult(result)
 }
 
