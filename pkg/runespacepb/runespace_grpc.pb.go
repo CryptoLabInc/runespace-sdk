@@ -37,7 +37,7 @@ const (
 //
 // RuneSpaceService is the per-team data-plane API for the encrypted vector index
 // engine. The engine holds only the PUBLIC evaluation key (never the secret
-// key); decryption happens client-side / in Vault.
+// key); decryption happens client-side / in Console.
 //
 // Provisioning: the instance boots UNREGISTERED. RegisterKeysStream loads the
 // RMP+MM eval keys (persisted to the PV, reloaded on restart/crash). Insert,
@@ -221,7 +221,7 @@ func (c *runeSpaceServiceClient) RemoveTag(ctx context.Context, in *RemoveTagReq
 //
 // RuneSpaceService is the per-team data-plane API for the encrypted vector index
 // engine. The engine holds only the PUBLIC evaluation key (never the secret
-// key); decryption happens client-side / in Vault.
+// key); decryption happens client-side / in Console.
 //
 // Provisioning: the instance boots UNREGISTERED. RegisterKeysStream loads the
 // RMP+MM eval keys (persisted to the PV, reloaded on restart/crash). Insert,

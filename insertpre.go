@@ -10,7 +10,7 @@ import (
 
 // PreEncryptedItem is an item that was already FHE-encrypted by an EncKey
 // holder elsewhere (e.g. rune-mcp on a developer machine). It lets a caller
-// that holds no keys at all — the Vault forwarding path — append the item
+// that holds no keys at all — the Console forwarding path — append the item
 // verbatim: the SDK never sees the plaintext and performs no encryption,
 // normalization, or centroid routing for it.
 //
@@ -62,7 +62,7 @@ func (it PreEncryptedItem) validate() error {
 // Insert it needs no bound key set and fetches no centroids: everything the
 // server checks was produced by the origin encryptor. Options (e.g.
 // WithFilterTags) apply the same way as for Insert; tags are trusted as sent,
-// so only a trusted caller (the Vault) should set them.
+// so only a trusted caller (the Console) should set them.
 func (c *Client) InsertPreEncrypted(ctx context.Context, it PreEncryptedItem, opts ...InsertOption) error {
 	c.mu.Lock()
 	conn := c.conn

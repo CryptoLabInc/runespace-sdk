@@ -646,7 +646,7 @@ type InsertRequest struct {
 	// rmp_item and an mm_item, routed against the instance's centroid set.
 	MmItem *MMItem `protobuf:"bytes,4,opt,name=mm_item,json=mmItem,proto3" json:"mm_item,omitempty"`
 	// Opaque filter-tag set: visibility labels the engine never interprets. Empty =
-	// public (survives every scope). Assigned by a trusted caller (Vault) and stored
+	// public (survives every scope). Assigned by a trusted caller (Console) and stored
 	// verbatim; Search excludes an item whose tags don't intersect the request scope
 	// (see SearchRequest.filter_scope).
 	FilterTags    []string `protobuf:"bytes,5,rep,name=filter_tags,json=filterTags,proto3" json:"filter_tags,omitempty"`
@@ -1173,7 +1173,7 @@ type SearchRequest struct {
 	// Requester's allowed filter-tag scope (opaque). An item survives if it has no
 	// tags (public) or ≥1 tag intersecting this scope; the rest are folded into each
 	// cell's dead. Empty/unset = no filter (return all). Trusted from the caller (no
-	// signature yet); scope provenance is the caller's (Vault's) responsibility.
+	// signature yet); scope provenance is the caller's (Console's) responsibility.
 	FilterScope   []string `protobuf:"bytes,4,rep,name=filter_scope,json=filterScope,proto3" json:"filter_scope,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
