@@ -6,7 +6,7 @@ import (
 )
 
 // CentroidSet is a public snapshot of the server's immutable IVF centroid set.
-// The Rune stack uses it for relay: the Vault fetches it here and re-serves it
+// The Rune stack uses it for relay: the Console fetches it here and re-serves it
 // to clients (rune-mcp → runed) that never dial runespace directly, so the
 // embedding side can compute the plaintext cluster assignment for inserts.
 //
@@ -42,7 +42,7 @@ func (s *CentroidSet) Assign(vec []float32) uint32 {
 
 // Centroids fetches the server's centroid set once and returns it. It shares
 // the client's internal cache with Insert routing, so calling both costs one
-// stream. Unlike the internal path this is exported for the Vault relay; a
+// stream. Unlike the internal path this is exported for the Console relay; a
 // server without a clustered tier yields a set with Enabled() == false.
 func (c *Client) Centroids(ctx context.Context) (*CentroidSet, error) {
 	cs, err := c.centroidSetCached(ctx)

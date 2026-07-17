@@ -117,7 +117,7 @@ func l2normalize(vec []float32) []float32 {
 // InvalidateCentroidCache drops the cached centroid set so the next
 // Centroids() / insert-routing call refetches it from the server. Call it when
 // the server reports a centroid version mismatch (ErrCentroidVersionMismatch)
-// — the set was replaced while this client was running — so relays (the Vault)
+// — the set was replaced while this client was running — so relays (the Console)
 // stop serving the stale set.
 func (c *Client) InvalidateCentroidCache() {
 	c.mu.Lock()

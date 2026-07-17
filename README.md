@@ -157,7 +157,7 @@ default. Pass `WithKeyParts(...)` to load a subset:
 | ---- | ----- | ---------- |
 | Encrypt + register (capture client) | `KeyPartEnc, KeyPartEval` | `EncryptFlat`/`EncryptClustered`, `RegisterKeys`, `Insert`, `Search` |
 | Encrypt only (key already registered) | `KeyPartEnc` | `EncryptFlat`/`EncryptClustered`, `Insert`, `Search` |
-| Decrypt only (vault) | `KeyPartSec` | `DecryptResult` (Search result decode) |
+| Decrypt only (console) | `KeyPartSec` | `DecryptResult` (Search result decode) |
 | Default (all parts) | omit `WithKeyParts` | everything |
 
 Calling an operation whose required part was not loaded returns

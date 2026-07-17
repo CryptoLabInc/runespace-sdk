@@ -6,7 +6,7 @@ option go_package = "github.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runes
 
 // RuneSpaceService is the per-team data-plane API for the encrypted vector index
 // engine. The engine holds only the PUBLIC evaluation key (never the secret
-// key); decryption happens client-side / in Vault.
+// key); decryption happens client-side / in Console.
 //
 // Provisioning: the instance boots UNREGISTERED. RegisterKeysStream loads the
 // RMP+MM eval keys (persisted to the PV, reloaded on restart/crash). Insert,
@@ -172,7 +172,7 @@ message InsertRequest {
   MMItem mm_item = 4;
 
   // Opaque filter-tag set: visibility labels the engine never interprets. Empty =
-  // public (survives every scope). Assigned by a trusted caller (Vault) and stored
+  // public (survives every scope). Assigned by a trusted caller (Console) and stored
   // verbatim; Search excludes an item whose tags don't intersect the request scope
   // (see SearchRequest.filter_scope).
   repeated string filter_tags = 5;
@@ -253,7 +253,7 @@ message SearchRequest {
   // Requester's allowed filter-tag scope (opaque). An item survives if it has no
   // tags (public) or ≥1 tag intersecting this scope; the rest are folded into each
   // cell's dead. Empty/unset = no filter (return all). Trusted from the caller (no
-  // signature yet); scope provenance is the caller's (Vault's) responsibility.
+  // signature yet); scope provenance is the caller's (Console's) responsibility.
   repeated string filter_scope = 4;
 }
 
