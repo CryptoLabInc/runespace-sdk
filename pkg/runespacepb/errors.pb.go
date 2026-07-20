@@ -161,7 +161,7 @@ const file_runespace_v1_errors_proto_rawDesc = "" +
 	"\x1bERROR_REASON_ENGINE_FAILURE\x10\x1e\x12\x1c\n" +
 	"\x18ERROR_REASON_MANIFEST_IO\x10\x1f\x12\x17\n" +
 	"\x13ERROR_REASON_WAL_IO\x10 \x12!\n" +
-	"\x1dERROR_REASON_REQUEST_CANCELED\x10(BCZAgithub.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepbb\x06proto3"
+	"\x1dERROR_REASON_REQUEST_CANCELED\x10(B?Z=github.com/CryptoLabInc/runespace/pkg/runespacepb;runespacepbb\x06proto3"
 
 var (
 	file_runespace_v1_errors_proto_rawDescOnce sync.Once

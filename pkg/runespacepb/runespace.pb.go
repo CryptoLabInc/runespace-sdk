@@ -7,11 +7,12 @@
 package runespacepb
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -2086,7 +2087,7 @@ const file_runespace_v1_runespace_proto_rawDesc = "" +
 	"\n" +
 	"UpdateTags\x12\x1f.runespace.v1.UpdateTagsRequest\x1a .runespace.v1.UpdateTagsResponse\x12I\n" +
 	"\bRetagAll\x12\x1d.runespace.v1.RetagAllRequest\x1a\x1e.runespace.v1.RetagAllResponse\x12L\n" +
-	"\tRemoveTag\x12\x1e.runespace.v1.RemoveTagRequest\x1a\x1f.runespace.v1.RemoveTagResponseBCZAgithub.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepbb\x06proto3"
+	"\tRemoveTag\x12\x1e.runespace.v1.RemoveTagRequest\x1a\x1f.runespace.v1.RemoveTagResponseB?Z=github.com/CryptoLabInc/runespace/pkg/runespacepb;runespacepbb\x06proto3"
 
 var (
 	file_runespace_v1_runespace_proto_rawDescOnce sync.Once
