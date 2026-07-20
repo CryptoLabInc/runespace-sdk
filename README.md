@@ -201,7 +201,7 @@ Treat encryption keys, backup recipients, checksums, retention, restore authoriz
 | Role | Parts | Available operations |
 | --- | --- | --- |
 | Capture client | `KeyPartEnc` | Local RMP/MM item encryption and `Insert`. |
-| Result vault | `KeyPartSec` | RMP/MM score decryption. |
+| Rune Console | `KeyPartSec` | RMP/MM score decryption. |
 | Full client | Omit `WithKeyParts` | Encryption, registration from disk, and decryption. |
 
 Evaluation keys are streamed from disk by `RegisterKeys`; `KeyPartEval` remains for source compatibility but does not keep the large evaluation keys resident in memory.
