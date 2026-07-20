@@ -36,8 +36,10 @@ func main() {
 		runespace.WithKeyID("example"),
 		runespace.WithKeyDim(dim),
 	}
-	if err := runespace.GenerateKeys(keyOpts...); err != nil {
-		log.Fatalf("GenerateKeys: %v", err)
+	if !runespace.KeysExist(keyOpts...) {
+		if err := runespace.GenerateKeys(keyOpts...); err != nil {
+			log.Fatalf("GenerateKeys: %v", err)
+		}
 	}
 	keys, err := runespace.OpenKeys(keyOpts...)
 	if err != nil {
@@ -80,8 +82,9 @@ func main() {
 	}
 	log.Printf("inserted id=%s", id)
 
-	// 5. Blind search: encrypt the query, search server-side over ciphertext,
-	//    decrypt and rank the top-k client-side.
+	// 5. Search: send the query vector under the current PCMM contract; the
+	//    server encodes it, evaluates against ciphertext items, and returns
+	//    encrypted scores for client-side decryption and ranking.
 	hits, err := c.Search(ctx, v, 5)
 	if err != nil {
 		log.Fatalf("Search: %v", err)

@@ -1,71 +1,76 @@
-# runespace-sdk
+<p align="center">
+  <a href="https://rune.team" aria-label="RUNE website">
+    <img src=".github/assets/repo-hero.svg" alt="RuneSpace SDK — Go client for encrypted vector search" width="100%">
+  </a>
+</p>
 
-Go client SDK for **RuneSpace** — blind vector search over FHE-encrypted
-embeddings (RNS-CKKS). The engine holds only the PUBLIC evaluation key and
-never sees plaintext or the secret key; this SDK owns the client side of that
-contract: it generates and manages the evi key set, encrypts embeddings and
-queries locally, drives the RuneSpace gRPC data plane, and decrypts search
-results.
+<p align="center">
+  <img src=".github/assets/repo-badges.svg" alt="Go client SDK · RNS-CKKS · Proprietary" width="590">
+</p>
 
-The high-level API is flat — vectors in, scores out:
+<p align="center">
+  <a href="https://rune.team">rune.team</a> ·
+  <a href="https://pkg.go.dev/github.com/CryptoLabInc/runespace-sdk">Go API</a> ·
+  <a href="https://github.com/CryptoLabInc/runespace-sdk/releases">Releases</a>
+</p>
 
-```go
-c, _ := runespace.Dial(addr)
-c.RegisterKeys(ctx, keys)              // upload the PUBLIC eval key
-c.Insert(ctx, "doc-1", embedding)      // encrypts locally, then Insert
-hits, _ := c.Search(ctx, query, 10)    // encrypts, searches, decrypts, ranks
-c.Delete(ctx, "doc-1")
-```
+RuneSpace SDK is the Go client for the RuneSpace encrypted vector index. It manages the client side of the RNS-CKKS contract: key generation, local item encryption, public evaluation-key registration, dual-tier inserts, search-result decryption, metadata resolution, and ranking.
 
-> The MM (clustered, IP1+) key path is reserved but **not yet implemented**;
-> `Keys.MMEvalKey` returns `ErrUnimplemented` and `RegisterKeys`
-> sends an empty `mm_eval_key`. Only the RMP (IP0) path is wired today.
+> [!CAUTION]
+> This repository is proprietary software. Access to the source or its public visibility does not grant permission to use, modify, redistribute, or deploy it. Obtain written authorization from CryptoLab before integrating the SDK; see [License](#license).
+
+## Security boundary
+
+The current data path has several distinct privacy properties:
+
+| Data | Current handling |
+| --- | --- |
+| Stored vector | L2-normalized and FHE-encrypted locally before `Insert`. |
+| Evaluation keys | Public key material streamed to RuneSpace for encrypted computation. |
+| Secret keys | Remain with the SDK key holder and are required to decrypt results. |
+| Search query vector | Under the current PCMM contract, sent plaintext to RuneSpace and encoded server-side. |
+| `metadata` argument | Stored as plaintext JSON by RuneSpace. Seal sensitive metadata before calling this SDK. |
+| Search scores | Returned encrypted and decrypted by the SDK before ranking. |
+
+RuneSpace never needs the FHE secret key, but the current API does **not** hide query vectors or SDK metadata from the RuneSpace service. Deploy the service inside the trust boundary appropriate for that contract.
 
 ## Requirements
 
-This SDK binds the libevi FHE primitives via cgo. Every machine that compiles a
-binary depending on `runespace-sdk` needs:
+The SDK binds bundled `libevi` archives through cgo.
 
-- Go 1.26.4 or newer (pinned in `go.mod`)
-- C toolchain (clang or gcc)
-- OpenSSL 3 — `libssl` + `libcrypto`, dev headers included
-- C++ standard library (`libc++` on macOS, `libstdc++` on Linux/Windows)
-- A host platform with a bundled libevi slice in `third_party/evi/`:
+- Go 1.26.4 or newer
+- A C/C++ toolchain
+- OpenSSL 3 development headers and libraries
+- A supported bundled libevi target:
   - `darwin/arm64`
-  - `linux/amd64`, `linux/arm64`
+  - `linux/amd64`
+  - `linux/arm64`
   - `windows/amd64`
 
-The libevi static archives (`libevi_c_api.a`, `libevi_crypto.a`, `libdeb.a`,
-`libalea.a`) are vendored in-tree, so no external libevi download is required.
-See `third_party/evi/PROVENANCE` for the pinned evi-crypto revision.
-
-### Per-platform install
-
-| Platform | One-shot install |
-| -------- | ---------------- |
-| macOS (Apple Silicon) | `xcode-select --install && brew install openssl@3` |
+| Platform | Prerequisites |
+| --- | --- |
+| macOS Apple Silicon | `xcode-select --install` and `brew install openssl@3` |
 | Debian / Ubuntu | `apt install build-essential libssl-dev` |
 | RHEL / Fedora | `dnf install gcc-c++ make openssl-devel` |
 | Alpine | `apk add build-base openssl-dev` |
-| Windows | MSYS2 mingw64 shell: `pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-openssl` |
+| Windows | MSYS2 mingw64 with GCC and OpenSSL packages |
 
-```sh
-go version                          # >= 1.26.4
-cc --version                        # clang or gcc
-pkg-config --modversion openssl     # >= 3.0
+Cross-compilation needs the target C toolchain and sysroot; setting only `GOOS` and `GOARCH` is insufficient.
+
+## Authorized installation
+
+There is no unrestricted public installation grant. After your organization has an agreement and repository access, use the approved version supplied by CryptoLab rather than an unqualified latest dependency:
+
+```bash
+GOPRIVATE=github.com/CryptoLabInc/runespace-sdk \
+  go get github.com/CryptoLabInc/runespace-sdk@<approved-version>
 ```
 
-cgo requires the **target** platform's C toolchain and sysroot — setting
-`GOOS`/`GOARCH` alone is not sufficient. Build on a native host (or container)
-per target. Platforms with no libevi slice in `third_party/evi/` will not link.
-
-## Install
-
-```sh
-go get github.com/CryptoLabInc/runespace-sdk
-```
+Do not vendor, mirror, redistribute, or deploy the module outside the scope of that agreement.
 
 ## Quick start
+
+This example matches the current API: `Insert` creates and returns the item ID, and search hits expose `ClusterID` and `Row` rather than a `Slot` field.
 
 ```go
 package main
@@ -74,121 +79,183 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	runespace "github.com/CryptoLabInc/runespace-sdk"
 )
 
 func main() {
-	ctx := context.Background()
-
-	// 1. Key set: generate once, then open wherever encrypt/decrypt is needed.
 	keyOpts := []runespace.KeysOption{
-		runespace.WithKeyPath("demo_keys"),
-		runespace.WithKeyID("demo-key"),
-		runespace.WithKeyDim(128), // must match the server's configured dim
+		runespace.WithKeyPath("./team-a-keys"),
+		runespace.WithKeyID("team-a"),
+		runespace.WithKeyDim(128),
 	}
 	if !runespace.KeysExist(keyOpts...) {
 		if err := runespace.GenerateKeys(keyOpts...); err != nil {
 			log.Fatal(err)
 		}
 	}
+
 	keys, err := runespace.OpenKeys(keyOpts...)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer keys.Close()
 
-	// 2. Connect over TLS (system cert pool).
-	c, err := runespace.Dial("runespace.example:51024",
-		runespace.WithAccessToken("..."))
+	client, err := runespace.Dial(
+		"runespace.example:51024",
+		runespace.WithAccessToken("<access-token>"),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer client.Close()
 
-	// 3. Register the PUBLIC eval key, then operate. No load/unload step.
-	if err := c.RegisterKeys(ctx, keys); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	if err := client.RegisterKeys(ctx, keys); err != nil {
 		log.Fatal(err)
 	}
-	if err := c.Insert(ctx, "doc-1", []float32{0.1, 0.2 /* ...dim... */}); err != nil {
-		log.Fatal(err)
-	}
-	hits, err := c.Search(ctx, []float32{0.1, 0.2 /* ...dim... */}, 10)
+
+	embedding := make([]float32, 128)
+	embedding[0] = 1 // replace with a real embedding of the configured dimension
+
+	id, err := client.Insert(
+		ctx,
+		embedding,
+		`{"title":"hello"}`,
+		runespace.WithFilterTags("team:platform"),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, h := range hits {
-		fmt.Printf("id=%s slot=%d score=%.4f\n", h.ID, h.Slot, h.Score)
+	fmt.Println("inserted", id)
+
+	hits, err := client.Search(
+		ctx,
+		embedding,
+		5,
+		runespace.WithScope("team:platform"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, hit := range hits {
+		fmt.Printf("id=%s cluster=%d row=%d score=%.4f metadata=%s\n",
+			hit.ID, hit.ClusterID, hit.Row, hit.Score, hit.Metadata)
 	}
 }
 ```
 
-`Insert`/`Search` validate that the vector length equals `keys.Dim()`. The
-engine returns scores by slot, not id; `Match.ID` is populated for items the
-same client inserted (see `Match`).
+Production connections use TLS and the system certificate pool by default. `WithInsecure()` exists only for explicitly trusted local development endpoints.
 
-Full API reference: <https://pkg.go.dev/github.com/CryptoLabInc/runespace-sdk>
+## Dual-tier data path
+
+The RMP and MM paths are both implemented and required by the current insert contract:
+
+1. `RegisterKeys` streams the public RMP and MM evaluation keys.
+2. `Insert` normalizes the item vector and creates both flat RMP and clustered MM ciphertexts.
+3. The SDK fetches the server's centroid set and routes the MM item to one cluster.
+4. `Search` always scans the flat tier and also probes clustered cells when the centroid set is enabled.
+5. The SDK decrypts both score sets, removes dead rows, merges and deduplicates hits, resolves IDs and metadata, and returns the top results.
+
+An insert without a usable centroid set fails with `ErrClusterRequired`. The MM path is not a reserved future feature.
+
+## Key durability and backup
+
+> [!WARNING]
+> Losing the `SecKey` files permanently destroys the ability to decrypt existing search results. Generating a new key set does not recover old data, and the current service does not provide transparent key rotation.
+
+`GenerateKeys` creates one identity across two directories:
+
+```text
+team-a-keys/
+├── rmp/   # EncKey, EvalKey, SecKey for the flat tier
+└── mm/    # EncKey, EvalKey, SecKey for the clustered tier
+```
+
+Back up the **entire key root**, not individual files:
+
+1. Wait for `GenerateKeys` to finish and stop processes that may replace or copy the directory.
+2. Take one atomic snapshot of both `rmp/` and `mm/` with file ownership and permissions preserved.
+3. Encrypt the backup with your organization's KMS, HSM, or offline backup key before it leaves the host.
+4. Store at least one copy outside the failure domain of the RuneSpace client and Console.
+5. Regularly restore into an isolated path, call `OpenKeys`, and use `Client.VerifyKeys` to confirm it matches the registered evaluation-key fingerprints.
+
+For example, teams that use `age` can stream an archive directly into encrypted storage without leaving an unencrypted tarball:
+
+```bash
+umask 077
+tar -C /srv/runespace -czf - team-a-keys \
+  | age -r 'age1replace-with-your-offline-recipient' \
+  > /secure-backup/team-a-keys.tar.gz.age
+```
+
+Treat encryption keys, backup recipients, checksums, retention, restore authorization, and audit logging as production secrets-management concerns. Never commit key material or backups to this repository.
+
+## Key loading roles
+
+`OpenKeys` loads encryption and decryption material by default. Limit a process to the parts it needs:
+
+| Role | Parts | Available operations |
+| --- | --- | --- |
+| Capture client | `KeyPartEnc` | Local RMP/MM item encryption and `Insert`. |
+| Result vault | `KeyPartSec` | RMP/MM score decryption. |
+| Full client | Omit `WithKeyParts` | Encryption, registration from disk, and decryption. |
+
+Evaluation keys are streamed from disk by `RegisterKeys`; `KeyPartEval` remains for source compatibility but does not keep the large evaluation keys resident in memory.
+
+## Common API
+
+| API | Purpose |
+| --- | --- |
+| `GenerateKeys` / `OpenKeys` | Create and open the paired RMP/MM key set. |
+| `RegisterKeys` / `VerifyKeys` | Register public evaluation keys and verify their identity. |
+| `Insert` / `InsertPreEncrypted` | Append a locally encrypted item or forward ciphertext produced elsewhere. |
+| `Search` | Search both tiers, decrypt scores, resolve metadata, and rank hits. |
+| `Delete` | Tombstone an item by ID. |
+| `UpdateTags`, `RetagAll`, `RemoveTag` | Maintain plaintext filter-tag scopes. |
+| `Info` | Inspect engine health, build identity, and registered-key metadata. |
+
+Filter tags and scopes are trusted plaintext labels. The server does not authenticate their provenance; only a trusted policy layer should construct them.
 
 ## Examples
 
-Runnable programs under `examples/` illustrate the common flows against a live
-instance (configured via `RUNESPACE_ADDR` / `RUNESPACE_DIM` / `RUNESPACE_TOKEN` /
-`RUNESPACE_KEYS`):
+Runnable programs live under [`examples/`](examples/):
 
 | Example | Flow |
-| ------- | ---- |
-| `examples/quickstart` | keygen → dial → register → insert → blind search |
-| `examples/filtertags` | tagged insert, scoped search, and the `UpdateTags` / `RetagAll` / `RemoveTag` tag mutators |
+| --- | --- |
+| [`examples/quickstart`](examples/quickstart/) | Key generation, registration, insert, and search. |
+| [`examples/filtertags`](examples/filtertags/) | Scoped inserts and tag mutation. |
 
-```sh
-RUNESPACE_ADDR=127.0.0.1:51024 RUNESPACE_DIM=128 go run ./examples/quickstart
+```bash
+RUNESPACE_ADDR=127.0.0.1:51024 \
+RUNESPACE_DIM=128 \
+RUNESPACE_KEYS=./rs-keys \
+go run ./examples/quickstart
 ```
 
-The end-to-end **verification** suite that stands up a real server and asserts
-crash/recovery/rebalance behavior lives in the `runespace` repo (`tests/`), next
-to the engine it verifies — not here.
-
-## Loading only the keys you need
-
-`OpenKeys` materialises all three key parts (EncKey, EvalKey, SecKey) by
-default. Pass `WithKeyParts(...)` to load a subset:
-
-| Role | Parts | What works |
-| ---- | ----- | ---------- |
-| Encrypt + register (capture client) | `KeyPartEnc, KeyPartEval` | `EncryptFlat`/`EncryptClustered`, `RegisterKeys`, `Insert`, `Search` |
-| Encrypt only (key already registered) | `KeyPartEnc` | `EncryptFlat`/`EncryptClustered`, `Insert`, `Search` |
-| Decrypt only (console) | `KeyPartSec` | `DecryptResult` (Search result decode) |
-| Default (all parts) | omit `WithKeyParts` | everything |
-
-Calling an operation whose required part was not loaded returns
-`ErrKeysNotForEncrypt`, `ErrKeysNotForDecrypt`, or `ErrKeysNotForRegister`.
+The crash, recovery, and rebalance end-to-end suite lives with the RuneSpace engine rather than in this repository.
 
 ## Building from source
 
-```sh
-git clone https://github.com/CryptoLabInc/runespace-sdk.git
-cd runespace-sdk
+Authorized source checkouts include the platform-specific libevi archives and generated protobuf stubs.
+
+```bash
 make build
 make test
+make vet
 ```
 
-| Target | Action |
-| ------ | ------ |
-| `make build` | `go build ./...` (includes the `examples/`) |
-| `make test` | `go test ./...` |
-| `make vet` | `go vet ./...` |
-| `make fmt` | `gofmt -w .` |
-| `make tidy` | `go mod tidy` |
-| `make cover` | race-enabled coverage profile |
+See [`third_party/evi/PROVENANCE`](third_party/evi/PROVENANCE) and [`pkg/runespacepb/PROVENANCE`](pkg/runespacepb/PROVENANCE) for pinned native-library and protocol provenance.
 
-`CGO_ENABLED=1` is exported by the Makefile so cross-compile environments do
-not silently produce a non-functional binary.
+## License
 
-The RuneSpace protobuf/gRPC stubs under `pkg/runespacepb/` are vendored
-(a verbatim hard copy from the `runespace` repo — see
-`pkg/runespacepb/PROVENANCE`); there is no local proto-generation step.
+Copyright © 2026 CryptoLab Inc. All rights reserved. This software is proprietary and confidential; use, modification, redistribution, cloud deployment, and commercial use require explicit written permission. Read the complete [LICENSE](LICENSE) before obtaining or using the software.
 
-## Refreshing the bundled libevi archives
+Licensing inquiries: `pypi@cryptolab.co.kr`
 
-See `third_party/evi/PROVENANCE` for the pinned evi-crypto revision and the
-multi-platform refresh procedure.
+<p align="center">
+  Part of <a href="https://rune.team">RUNE</a> · Built by <a href="https://www.cryptolab.co.kr/">CryptoLab</a>
+</p>
