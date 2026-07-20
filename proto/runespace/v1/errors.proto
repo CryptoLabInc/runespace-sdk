@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package runespace.v1;
 
-option go_package = "github.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepb";
+option go_package = "github.com/CryptoLabInc/runespace/pkg/runespacepb;runespacepb";
 
 // ErrorReason is the machine-readable cause attached to a failed RPC via a
 // google.rpc.ErrorInfo status detail; the gRPC status code stays the coarse

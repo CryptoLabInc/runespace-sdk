@@ -7,75 +7,20 @@ repo — this SDK vendors them. To update: regenerate in the upstream repo and
 re-copy all three .pb.go files plus both reference .proto files, then bump the
 commit below.
 
-LOCAL MODIFICATION (ahead of the pin)
--------------------------------------
-runespace.pb.go, runespace_grpc.pb.go and proto/runespace/v1/runespace.proto were
-updated locally after editing the upstream proto to make GetCentroids a
-SERVER-STREAMING RPC: it now returns `stream GetCentroidsChunk` (one
-CentroidSetHeader frame, then id-ordered CentroidBatch frames) instead of a single
-GetCentroidsResponse, so a large centroid set (nlist*dim floats) transfers without
-one oversized message. GetCentroidsResponse was removed; CentroidSetHeader and
-CentroidBatch were added. That change is committed on the runespace epic branch as
-c23de29 (ahead of the af2b411 pin, not yet on main), so these files are NO LONGER a
-verbatim copy of the af2b411 pin. errors.pb.go carries the ERROR_REASON_INVALID_TAG
-addition noted below (also ahead of the pin). Fold into the next upstream re-pin once
-the change lands on main.
-
-Additionally re-copied from the runespace `feat/team-based-filter` branch (working
-tree, not yet committed/landed) to add the filter-set (team-based) feature:
-  - InsertRequest.filter_tags (5) — opaque per-item visibility tag set.
-  - SearchRequest.filter_scope (4) — requester's allowed tag scope.
-  - GetMetadataRequest.filter_scope (4) — same scope for the resolve-time gate.
-  - UpdateTags RPC + UpdateTagsRequest/Response — add/remove an item's tags.
-  - RetagAll RPC + RetagAllRequest/Response — bulk replace filter tag `from` with
-    `to` across every item carrying it (returns the changed count).
-  - RemoveTag RPC + RemoveTagRequest/Response — bulk strip filter tag `tag` from
-    every item carrying it (returns the changed count).
-  - errors.pb.go: added ErrorReason ERROR_REASON_INVALID_TAG (14) for the bulk
-    tag-op argument gate — so errors.pb.go is NO LONGER verbatim at the af2b411 pin.
-  - CellResult.dead changed from `repeated int64` (position list) to `bytes` (packed
-    position bitmap, field renumbered 3->4); the SDK decode moved to a bit test.
-Re-pin to the landed commit once this feature merges upstream.
-
 Source
 ------
-  Repo    : github.com/jh-lee-cryptolab/runespace   (private)
-  Commit  : af2b411 (branch epic/compaction-scheduling-cellmap; NOT yet on main)
+  Repo    : github.com/CryptoLabInc/runespace   (private)
+  Commit  : 1d7663f (main)
   Files   : pkg/runespacepb/runespace.pb.go
             pkg/runespacepb/runespace_grpc.pb.go
             pkg/runespacepb/errors.pb.go
   Proto   : proto/runespace/v1/runespace.proto   (proto package runespace.v1)
             proto/runespace/v1/errors.proto
   Service : RuneSpaceService — GetInfo, RegisterKeysStream, Insert, Search,
-            GetCentroids, GetMetadata, Delete
+            GetCentroids, GetMetadata, Delete, UpdateTags, RetagAll, RemoveTag
 
   All three .pb.go files and both reference .proto files are a coherent verbatim
-  copy of upstream at this commit (no per-file drift). Pinned to the epic branch,
-  not main — re-pin to a main-branch commit once the epic lands upstream.
-
-Data-plane shape at this commit (changed from the prior 1f28fb6 pin)
---------------------------------------------------------------------
-  (1) Cluster tier is mandatory — every Insert carries BOTH a flat RMPItem
-      {item} and a cluster MMItem {item, cluster_id, centroid_set_version}.
-      mm_item is no longer optional (ERROR_REASON_MISSING_MM_ITEM); flat-only
-      insert was removed. GetCentroids returns the instance's immutable IVF
-      centroid set so the client routes inserts in plaintext.
-  (2) Server-side probe selection — SearchRequest carries only the
-      L2-normalized plaintext query; fields 2,3 (probe_clusters,
-      centroid_set_version) are RESERVED. The server picks the probed clusters
-      from the query and forces nprobe from its own config.
-  (3) (cell_id, row) result addressing — SearchResponse carries tomb_epoch +
-      repeated CellResult rmp + repeated CellResult mm, where CellResult is
-      {cell_id, blob, dead}; each tier returns one blob per live cell (RMP/IP0
-      and MM/IP1 decode under different CKKS contexts), dead rows co-located per
-      blob in that cell's local coordinates. GetMetadata takes rmp_rows +
-      mm_rows (both repeated CellRow {cell_id, row}) and returns parallel
-      rmp_entries + mm_entries. The earlier single RMPResult / per-cluster
-      MMResult{cluster_id} / rmp_slots+MMRow shapes are gone.
-  (4) KeyMeta — KeyHeader carries key identity (kid/preset/dim/eval_mode); the
-      server persists a KeyMeta (identity + sha256 fingerprint) beside each eval
-      key and GetInfoResponse.registered_keys echoes them for cross-verification.
-      RegisterKeys is stream-only (RegisterKeysStream{Request,Response}).
+  copy of upstream at this commit (no per-file drift).
 
 Generators
 ----------
@@ -85,7 +30,7 @@ Generators
 Notes
 -----
 - The embedded file-descriptor go_package
-  (github.com/jh-lee-cryptolab/runespace/pkg/runespacepb) is preserved from the
+  (github.com/CryptoLabInc/runespace/pkg/runespacepb) is preserved from the
   source repo as metadata; it does not affect how this SDK imports the package,
   which is github.com/CryptoLabInc/runespace-sdk/pkg/runespacepb.
 - proto/runespace/v1/*.proto are included for reference only. There is no local

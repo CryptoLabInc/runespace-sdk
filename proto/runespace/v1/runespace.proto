@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package runespace.v1;
 
-option go_package = "github.com/jh-lee-cryptolab/runespace/pkg/runespacepb;runespacepb";
+option go_package = "github.com/CryptoLabInc/runespace/pkg/runespacepb;runespacepb";
 
 // RuneSpaceService is the per-team data-plane API for the encrypted vector index
 // engine. The engine holds only the PUBLIC evaluation key (never the secret
