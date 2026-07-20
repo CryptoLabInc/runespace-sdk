@@ -46,9 +46,12 @@ var (
 	// set, and retry the insert once with the same id.
 	ErrCentroidVersionMismatch = errors.New("runespace: centroid set version mismatch (set was replaced)")
 
-	// ErrUnimplemented marks the MM (clustered, IP1+) path, which is reserved
-	// but not yet available.
-	ErrUnimplemented = errors.New("runespace: not implemented (MM path is reserved)")
+	// ErrUnimplemented is retained for source compatibility with pre-MM SDK
+	// releases. The current RMP and MM paths are implemented and no current API
+	// returns this sentinel.
+	//
+	// Deprecated: no current operation returns ErrUnimplemented.
+	ErrUnimplemented = errors.New("runespace: not implemented")
 )
 
 // centroidMismatchReason is the ErrorInfo reason the server attaches when an
