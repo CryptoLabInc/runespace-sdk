@@ -28,7 +28,7 @@ const FlatClusterID = int32(-1)
 type centroidSet struct {
 	version string
 	dim     int
-	preset  string      // evi preset the set was trained for (hash ingredient — relayed for verification)
+	preset  string // evi preset the set was trained for (hash ingredient — relayed for verification)
 	vectors [][]float32 // vectors[i] is cluster i's centroid; len == nlist
 }
 
